@@ -164,7 +164,7 @@ def main():
                 "model_fine_state_dict": model_fine.state_dict(),
                 "loss": loss,
                 "psnr": psnr
-            }, os.path.join(logdir, "latest.ckpt"))
+            }, os.path.join(logdir, "checkpoint" + str(i).zfill(5) + ".ckpt"))
 
 
     print("Done!")
