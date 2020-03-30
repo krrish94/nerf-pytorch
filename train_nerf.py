@@ -165,6 +165,7 @@ def main():
                 "loss": loss,
                 "psnr": psnr
             }, os.path.join(logdir, "checkpoint" + str(i).zfill(5) + ".ckpt"))
+            print("================== Saved Checkpoint =================")
 
 
     print("Done!")
