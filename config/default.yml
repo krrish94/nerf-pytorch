@@ -12,6 +12,8 @@ experiment:
   validate_every: 1
   # Number of training iterations after which to checkpoint.
   save_every: 100
+  # Number of training iterations aftger which to print progress.
+  print_every: 10
 
 # Dataset parameters.
 dataset:

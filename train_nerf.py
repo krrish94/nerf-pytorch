@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 import yaml
 
 import numpy as np
@@ -123,16 +124,19 @@ def main():
         psnr = mse2psnr(loss.item())
         optimizer.step()
         optimizer.zero_grad()
-        print("Loss:", loss.item(), "PSNR:", psnr)
+        if i % cfg.experiment.print_every == 0 or i == cfg.experiment.train_iters - 1:
+            print("[TRAIN] Iter:", i, "Loss:", loss.item(), "PSNR:", psnr)
         writer.add_scalar("train/loss", loss.item(), i)
         writer.add_scalar("train/psnr", psnr, i)
 
         # Validation
         if i % cfg.experiment.validate_every == 0 or i == cfg.experiment.train_iters - 1:
+            print("[VAL] =======> Iter:", i)
             model_coarse.eval()
             if model_fine:
                 model_coarse.eval()
 
+            start = time.time()
             with torch.no_grad():
                 img_idx = np.random.choice(i_val)
                 img_target = images[img_idx].to(device)
@@ -151,7 +155,7 @@ def main():
                 writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]).detach().cpu())
                 writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]).detach().cpu())
                 writer.add_image("validation/img_target", cast_to_image(img_target[..., :3]).detach().cpu())
-                print("Validation loss:", loss.item(), "Validation PSNR:", psnr)
+                print("Validation loss:", loss.item(), "Validation PSNR:", psnr, "Time:", time.time() - start)
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:
             torch.save({
