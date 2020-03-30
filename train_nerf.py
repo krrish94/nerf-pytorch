@@ -6,6 +6,7 @@ import yaml
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm, trange
 
 import models
 from cfgnode import CfgNode
@@ -84,7 +85,7 @@ def main():
 
     # # TODO: Prepare raybatch tensor if batching random rays
 
-    for i in range(cfg.experiment.train_iters):
+    for i in trange(cfg.experiment.train_iters):
 
         model_coarse.train()
         if model_fine:
@@ -125,13 +126,13 @@ def main():
         optimizer.step()
         optimizer.zero_grad()
         if i % cfg.experiment.print_every == 0 or i == cfg.experiment.train_iters - 1:
-            print("[TRAIN] Iter:", i, "Loss:", loss.item(), "PSNR:", psnr)
+            tqdm.write("[TRAIN] Iter: " + str(i) + " Loss: " + str(loss.item()) + " PSNR: " + str(psnr))
         writer.add_scalar("train/loss", loss.item(), i)
         writer.add_scalar("train/psnr", psnr, i)
 
         # Validation
         if i % cfg.experiment.validate_every == 0 or i == cfg.experiment.train_iters - 1:
-            print("[VAL] =======> Iter:", i)
+            tqdm.write("[VAL] =======> Iter: " + str(i))
             model_coarse.eval()
             if model_fine:
                 model_coarse.eval()
@@ -151,11 +152,10 @@ def main():
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validataion/psnr", psnr, i)
-                print(rgb_coarse.shape, rgb_coarse[..., :3].min(), rgb_coarse[..., :3].max())
                 writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]).detach().cpu())
                 writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]).detach().cpu())
                 writer.add_image("validation/img_target", cast_to_image(img_target[..., :3]).detach().cpu())
-                print("Validation loss:", loss.item(), "Validation PSNR:", psnr, "Time:", time.time() - start)
+                tqdm.write("Validation loss: " + str(loss.item()) + " Validation PSNR: " + str(psnr) + "Time: " + str(time.time() - start))
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:
             torch.save({
@@ -165,7 +165,7 @@ def main():
                 "loss": loss,
                 "psnr": psnr
             }, os.path.join(logdir, "checkpoint" + str(i).zfill(5) + ".ckpt"))
-            print("================== Saved Checkpoint =================")
+            tqdm.write("================== Saved Checkpoint =================")
 
 
     print("Done!")
