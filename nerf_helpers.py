@@ -2,6 +2,7 @@ from typing import Optional
 
 import os
 
+import math
 import numpy as np
 import torch
 import torchsearchsorted
@@ -12,7 +13,7 @@ def img2mse(img_src, img_tgt):
 
 
 def mse2psnr(mse):
-    return -10. * torch.log(x) / torch.log(10.)
+    return -10. * math.log10(mse)
 
 
 def get_minibatches(inputs: torch.Tensor, chunksize: Optional[int] = 1024 * 8):

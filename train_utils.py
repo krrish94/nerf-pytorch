@@ -170,3 +170,21 @@ def run_one_iter_of_nerf(H, W, focal, model_coarse, model_fine, batch_rays,
         acc_fine_ = None
 
     return rgb_coarse_, disp_coarse_, acc_coarse_, rgb_fine_, disp_fine_, acc_fine_
+
+
+def eval_nerf(height, width, focal_length, model_coarse, model_fine,
+              ray_origins, ray_directions, options, mode="validation"):
+    r"""Evaluate a NeRF by synthesizing a full image (as opposed to train mode, where
+    only a handful of rays/pixels are synthesized).
+    """
+    original_shape = ray_origins.shape
+    ray_origins = ray_origins.reshape((1, -1, 3))
+    ray_directions = ray_directions.reshape((1, -1, 3))
+    batch_rays = torch.cat((ray_origins, ray_directions), dim=0)
+    rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
+        height, width, focal_length, model_coarse, model_fine, batch_rays, options, mode="validation"
+    )
+    rgb_coarse = rgb_coarse.reshape(original_shape)
+    rgb_fine = rgb_fine.reshape(original_shape)
+
+    return rgb_coarse, None, None, rgb_fine, None, None
