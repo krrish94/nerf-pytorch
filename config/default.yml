@@ -1,0 +1,41 @@
+experiment:
+  id: default
+  logdir: logs/default
+  randomseed: 8239
+dataset:
+  basedir: cache/nerf_example_data/nerf_synthetic/lego
+  half_res: True
+  testskip: 50
+models:
+  coarse:
+    type: FlexibleNeRFModel
+    num_layers: 4
+    hidden_size: 128
+    skip_connect_every: 4
+    num_encoding_functions: 6
+  fine:
+    type: FlexibleNeRFModel
+    num_layers: 4
+    hidden_size: 128
+    skip_connect_every: 4
+    num_encoding_functions: 6
+    use_viewdirs: True
+optimizer:
+  type: SGD
+  lr: 5.0E-4
+nerf:
+  use_viewdirs: True
+  ndc: True
+  near: 0.
+  far: 1.
+  encode_position_fn: positional_encoding
+  encode_direction_fn: positional_encoding
+  train:
+    num_random_rays: 32
+    chunksize: 8
+    perturb: True
+    num_coarse: 64
+    num_fine: 64
+    white_background: False
+    radiance_field_noise_std: 0.
+    lindisp: False
