@@ -3,6 +3,7 @@ import os
 import time
 import yaml
 
+import glob
 import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
@@ -36,16 +37,28 @@ def main():
     # # (Optional:) enable this to track autograd issues when debugging
     # torch.autograd.set_detect_anomaly(True)
 
-    # Load dataset
-    images, poses, render_poses, hwf, i_split = load_blender_data(
-        cfg.dataset.basedir,
-        half_res=cfg.dataset.half_res,
-        testskip=cfg.dataset.testskip
-    )
-    i_train, i_val, i_test = i_split
-    H, W, focal = hwf
-    H, W = int(H), int(W)
-    hwf = [H, W, focal]
+    # If a pre-cached dataset is available, skip the dataloader.
+    train_paths, validation_paths = None, None
+    images, poses, render_poses, hwf, i_split = None, None, None, None, None
+    H, W, focal, i_train, i_val, i_test = None, None, None, None, None, None
+    if os.path.exists(cfg.dataset.cachedir):
+        train_paths = glob.glob(
+            os.path.join(cfg.dataset.cachedir, "train", "*.data")
+        )
+        validation_paths = glob.glob(
+            os.path.join(cfg.dataset.cachedir, "val", "*.data")
+        )
+    else:
+        # Load dataset
+        images, poses, render_poses, hwf, i_split = load_blender_data(
+            cfg.dataset.basedir,
+            half_res=cfg.dataset.half_res,
+            testskip=cfg.dataset.testskip
+        )
+        i_train, i_val, i_test = i_split
+        H, W, focal = hwf
+        H, W = int(H), int(W)
+        hwf = [H, W, focal]
 
     # Seed experiment for repeatability
     seed = cfg.experiment.randomseed
@@ -91,33 +104,46 @@ def main():
         if model_fine:
             model_coarse.train()
 
-        img_idx = np.random.choice(i_train)
-        img_target = images[img_idx].to(device)
-        pose_target = poses[img_idx, :3, :4].to(device)
-        ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
-        coords = torch.stack(meshgrid_xy(torch.arange(H).to(device),
-                                         torch.arange(W).to(device)), dim=-1)
-        coords = coords.reshape((-1, 2))
-        select_inds = np.random.choice(
-            coords.shape[0], size=(cfg.nerf.train.num_random_rays), replace=False
-        )
-        select_inds = coords[select_inds]
-        ray_origins = ray_origins[select_inds[:, 0], select_inds[:, 1], :]
-        ray_directions = ray_directions[select_inds[:, 0], select_inds[:, 1], :]
-        batch_rays = torch.stack([ray_origins, ray_directions], dim=0)
-        target_s = img_target[select_inds[:, 0], select_inds[:, 1], :]
-        
-        rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine = run_one_iter_of_nerf(
-            H, W, focal, model_coarse, model_fine, batch_rays, cfg, mode="train"
-        )
+        rgb_coarse, rgb_fine = None, None
+        target_ray_values = None
+        if cfg.dataset.cachedir:
+            datafile = np.random.choice(train_paths)
+            cache_dict = torch.load(datafile)
+            rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
+                cache_dict["height"], cache_dict["width"], cache_dict["focal_length"],
+                model_coarse, model_fine, cache_dict["ray_bundle"].to(device), cfg,
+                mode="train"
+            )
+            target_ray_values = cache_dict["target"].to(device)
+        else:
+            img_idx = np.random.choice(i_train)
+            img_target = images[img_idx].to(device)
+            pose_target = poses[img_idx, :3, :4].to(device)
+            ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
+            coords = torch.stack(meshgrid_xy(torch.arange(H).to(device),
+                                             torch.arange(W).to(device)), dim=-1)
+            coords = coords.reshape((-1, 2))
+            select_inds = np.random.choice(
+                coords.shape[0], size=(cfg.nerf.train.num_random_rays), replace=False
+            )
+            select_inds = coords[select_inds]
+            ray_origins = ray_origins[select_inds[:, 0], select_inds[:, 1], :]
+            ray_directions = ray_directions[select_inds[:, 0], select_inds[:, 1], :]
+            batch_rays = torch.stack([ray_origins, ray_directions], dim=0)
+            target_s = img_target[select_inds[:, 0], select_inds[:, 1], :]
+            
+            rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
+                H, W, focal, model_coarse, model_fine, batch_rays, cfg, mode="train"
+            )
+            target_ray_values = target_s
 
         coarse_loss = torch.nn.functional.mse_loss(
-            rgb_coarse[..., :3], target_s[..., :3]
+            rgb_coarse[..., :3], target_ray_values[..., :3]
         )
         fine_loss = None
         if rgb_fine is not None:
             fine_loss = torch.nn.functional.mse_loss(
-                rgb_fine[..., :3], target_s[..., :3]
+                rgb_fine[..., :3], target_ray_values[..., :3]
             )
         # loss = torch.nn.functional.mse_loss(rgb_pred[..., :3], target_s[..., :3])
         loss = coarse_loss + (fine_loss if fine_loss is not None else 0.)
@@ -139,22 +165,35 @@ def main():
 
             start = time.time()
             with torch.no_grad():
-                img_idx = np.random.choice(i_val)
-                img_target = images[img_idx].to(device)
-                pose_target = poses[img_idx, :3, :4].to(device)
-                ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
-                rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
-                    H, W, focal, model_coarse, model_fine, ray_origins, ray_directions, cfg
-                )
-                coarse_loss = img2mse(rgb_coarse[..., :3], img_target[..., :3])
-                fine_loss = img2mse(rgb_coarse[..., :3], img_target[..., :3])
+                rgb_coarse, rgb_fine = None, None
+                target_ray_values = None
+                if cfg.dataset.cachedir:
+                    datafile = np.random.choice(validation_paths)
+                    cache_dict = torch.load(datafile)
+                    rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
+                        cache_dict["height"], cache_dict["width"], cache_dict["focal_length"],
+                        model_coarse, model_fine, cache_dict["ray_origins"].to(device),
+                        cache_dict["ray_directions"].to(device), cfg, mode="train"
+                    )
+                    target_ray_values = cache_dict["target"].to(device)
+                else:
+                    img_idx = np.random.choice(i_val)
+                    img_target = images[img_idx].to(device)
+                    pose_target = poses[img_idx, :3, :4].to(device)
+                    ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
+                    rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
+                        H, W, focal, model_coarse, model_fine, ray_origins, ray_directions, cfg
+                    )
+                    target_ray_values = img_target
+                coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
+                fine_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
                 loss = coarse_loss + fine_loss
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validataion/psnr", psnr, i)
                 writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]).detach().cpu())
                 writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]).detach().cpu())
-                writer.add_image("validation/img_target", cast_to_image(img_target[..., :3]).detach().cpu())
+                writer.add_image("validation/img_target", cast_to_image(target_ray_values[..., :3]).detach().cpu())
                 tqdm.write("Validation loss: " + str(loss.item()) + " Validation PSNR: " + str(psnr) + "Time: " + str(time.time() - start))
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:

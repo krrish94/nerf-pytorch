@@ -1,0 +1,124 @@
+# Parameters to setup experiment.
+experiment:
+  # Unique experiment identifier
+  id: default
+  # Experiment logs will be stored at "logdir"/"id"
+  logdir: logs
+  # Seed for random number generators (for repeatability).
+  randomseed: 8239
+  # Number of training iterations.
+  train_iters: 1
+  # Number of training iterations after which to validate.
+  validate_every: 1
+  # Number of training iterations after which to checkpoint.
+  save_every: 100
+  # Number of training iterations aftger which to print progress.
+  print_every: 10
+
+# Dataset parameters.
+dataset:
+  # Base directory of dataset.
+  basedir: cache/nerf_example_data/nerf_synthetic/lego
+  # Optionally, provide a path to the pre_cached dataset dir. This
+  # overrides the other dataset options.
+  cachedir: cache/legocache
+  # For the Blender datasets (synthetic), optionally return images
+  # at half the original resolution of 800 x 800, to save space.
+  half_res: True
+  # Stride (include one per "testskip" images in the dataset).
+  testskip: 50
+
+# Model parameters.
+models:
+  # Coarse model.
+  coarse:
+    # Name of the torch.nn.Module class that implements the model.
+    type: FlexibleNeRFModel
+    # Number of layers in the model.
+    num_layers: 4
+    # Number of hidden units in each layer of the MLP (multi-layer
+    # perceptron).
+    hidden_size: 128
+    # Add a skip connection once in a while. Note: This parameter
+    # won't take affect unless num_layers > skip_connect_every.
+    skip_connect_every: 4
+    # Number of encoding functions to use (Eg. in positional encoding).
+    num_encoding_functions: 6
+    # Additionally use viewing directions as input.
+    use_viewdirs: True
+  fine:
+    # Name of the torch.nn.Module class that implements the model.
+    type: FlexibleNeRFModel
+    # Number of layers in the model.
+    num_layers: 4
+    # Number of hidden units in each layer of the MLP (multi-layer
+    # perceptron).
+    hidden_size: 128
+    # Add a skip connection once in a while. Note: This parameter
+    # won't take affect unless num_layers > skip_connect_every.
+    skip_connect_every: 4
+    # Number of encoding functions to use (Eg. in positional encoding).
+    num_encoding_functions: 6
+    # Additionally use viewing directions as input.
+    use_viewdirs: True
+
+# Optimizer params.
+optimizer:
+  # Name of the torch.optim class used for optimization.
+  type: SGD
+  # Learning rate.
+  lr: 5.0E-4
+
+# NeRF parameters.
+nerf:
+  # Use viewing directions as input, in addition to the X, Y, Z coordinates.
+  use_viewdirs: True
+  # Use normalized device coordinates (TODO: Add explanation).
+  ndc: True
+  # Nearest depth to consider for sampling.
+  near: 0.
+  # Farthest depth to consider for sampling.
+  far: 1.
+  # Encoding function for position (X, Y, Z).
+  encode_position_fn: positional_encoding
+  # Encoding function for ray direction (theta, phi).
+  encode_direction_fn: positional_encoding
+  # Training-specific parameters.
+  train:
+    # Number of random rays to retain from each image.
+    # These sampled rays are used for training, and the others are discarded.
+    num_random_rays: 8
+    # Size of each chunk (rays are batched into "chunks" and passed through
+    # the network)
+    chunksize: 8
+    # Whether or not to perturb the sampled depth values.
+    perturb: True
+    # Number of depth samples per ray for the coarse network.
+    num_coarse: 8
+    # Number of depth samples per ray for the fine network.
+    num_fine: 8
+    # Whether to render models using a white background.
+    white_background: False
+    # Standard deviation of noise to be added to the radiance field when
+    # performing volume rendering.
+    radiance_field_noise_std: 0.
+    # Sample linearly in disparity space, as opposed to in depth space.
+    lindisp: False
+  # Validation-specific parameters.
+  validation:
+    # Number of random rays to retain from each image.
+    # These sampled rays are used for training, and the others are discarded.
+    chunksize: 8
+    # Whether or not to perturb the sampled depth values.
+    perturb: False
+    # Number of depth samples per ray for the coarse network.
+    num_coarse: 8
+    # Number of depth samples per ray for the fine network.
+    num_fine: 8
+    # Whether to render models using a white background.
+    white_background: False
+    # Standard deviation of noise to be added to the radiance field when
+    # performing volume rendering.
+    radiance_field_noise_std: 0.
+    # Sample linearly in disparity space, as opposed to in depth space.
+    lindisp: False
