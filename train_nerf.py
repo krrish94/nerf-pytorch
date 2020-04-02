@@ -26,6 +26,9 @@ def main():
     parser.add_argument(
         "--config", type=str, required=True, help="Path to (.yml) config file."
     )
+    parser.add_argument(
+        "--load-checkpoint", type=str, default="", help="Path to load saved checkpoint from."
+    )
     configargs = parser.parse_args()
 
     # Read config file.
@@ -38,16 +41,18 @@ def main():
     # torch.autograd.set_detect_anomaly(True)
 
     # If a pre-cached dataset is available, skip the dataloader.
+    USE_CACHED_DATASET = False
     train_paths, validation_paths = None, None
     images, poses, render_poses, hwf, i_split = None, None, None, None, None
     H, W, focal, i_train, i_val, i_test = None, None, None, None, None, None
-    if os.path.exists(cfg.dataset.cachedir):
+    if hasattr(cfg.dataset, "cachedir") and os.path.exists(cfg.dataset.cachedir):
         train_paths = glob.glob(
             os.path.join(cfg.dataset.cachedir, "train", "*.data")
         )
         validation_paths = glob.glob(
             os.path.join(cfg.dataset.cachedir, "val", "*.data")
         )
+        USE_CACHED_DATASET = True
     else:
         # Load dataset
         images, poses, render_poses, hwf, i_split = load_blender_data(
@@ -96,6 +101,14 @@ def main():
     with open(os.path.join(logdir, "config.yml"), "w") as f:
         f.write(cfg.dump()) #cfg, f, default_flow_style=False)
 
+    # Load an existing checkpoint, if a path is specified.
+    if os.path.exists(configargs.load_checkpoint):
+        checkpoint = torch.load(configargs.load_checkpoint)
+        model_coarse.load_state_dict(checkpoint["model_coarse_state_dict"])
+        if checkpoint["model_fine_state_dict"]:
+            model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
+        # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
     # # TODO: Prepare raybatch tensor if batching random rays
 
     for i in trange(cfg.experiment.train_iters):
@@ -106,7 +119,7 @@ def main():
 
         rgb_coarse, rgb_fine = None, None
         target_ray_values = None
-        if cfg.dataset.cachedir:
+        if USE_CACHED_DATASET:
             datafile = np.random.choice(train_paths)
             cache_dict = torch.load(datafile)
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
@@ -167,7 +180,7 @@ def main():
             with torch.no_grad():
                 rgb_coarse, rgb_fine = None, None
                 target_ray_values = None
-                if cfg.dataset.cachedir:
+                if USE_CACHED_DATASET:
                     datafile = np.random.choice(validation_paths)
                     cache_dict = torch.load(datafile)
                     rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
@@ -197,13 +210,15 @@ def main():
                 tqdm.write("Validation loss: " + str(loss.item()) + " Validation PSNR: " + str(psnr) + "Time: " + str(time.time() - start))
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:
-            torch.save({
+            checkpoint_dict = {
                 "iter": i,
                 "model_coarse_state_dict": model_coarse.state_dict(),
-                "model_fine_state_dict": model_fine.state_dict(),
+                "model_fine_state_dict": None if not model_fine else model_fine.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
                 "loss": loss,
-                "psnr": psnr
-            }, os.path.join(logdir, "checkpoint" + str(i).zfill(5) + ".ckpt"))
+                "psnr": psnr,
+            }
+            torch.save(checkpoint_dict, os.path.join(logdir, "checkpoint" + str(i).zfill(5) + ".ckpt"))
             tqdm.write("================== Saved Checkpoint =================")
 
 
