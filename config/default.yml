@@ -19,6 +19,9 @@ experiment:
 dataset:
   # Base directory of dataset.
   basedir: cache/nerf_example_data/nerf_synthetic/lego
+  # Optionally, provide a path to the pre_cached dataset dir. This
+  # overrides the other dataset options.
+  cachedir: cache/legocache
   # For the Blender datasets (synthetic), optionally return images
   # at half the original resolution of 800 x 800, to save space.
   half_res: True
