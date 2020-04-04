@@ -34,8 +34,8 @@ class MultiHeadNeRFModel(torch.nn.Module):
     separate heads).
     """
 
-    def __init__(self, filter_size=128, num_encoding_functions=6, use_viewdirs=True):
-        super(NeRFModel, self).__init__()
+    def __init__(self, hidden_size=128, num_encoding_functions=6, use_viewdirs=True):
+        super(MultiHeadNeRFModel, self).__init__()
         self.num_encoding_functions = num_encoding_functions
         self.xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
         if use_viewdirs is True:
