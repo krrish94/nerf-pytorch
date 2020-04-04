@@ -90,11 +90,11 @@ class ReplicateNeRFModel(torch.nn.Module):
         self.layer6 = torch.nn.Linear(hidden_size, hidden_size)
         self.layer7 = torch.nn.Linear(hidden_size, hidden_size)
         self.layer8 = torch.nn.Linear(hidden_size, 1 + hidden_size)
-        self.layer9 = torch.nn.Linear(hidden_size + 3 + 24, hidden_size // 2)
+        self.layer9 = torch.nn.Linear(hidden_size + 3 + 36, hidden_size // 2)
         self.layer10 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
         self.layer11 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
         self.layer12 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
-        self.layer13 = torch.nn.Linear(hidden_size, 3)
+        self.layer13 = torch.nn.Linear(hidden_size // 2, 3)
         self.relu = torch.nn.functional.relu
     
     def forward(self, x):
