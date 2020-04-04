@@ -29,6 +29,39 @@ class VeryTinyNeRFModel(torch.nn.Module):
         return x
 
 
+class MultiHeadNeRFModel(torch.nn.Module):
+    r"""Define a "multi-head" NeRF model (radiance and RGB colors are predicted by
+    separate heads).
+    """
+
+    def __init__(self, filter_size=128, num_encoding_functions=6, use_viewdirs=True):
+        super(NeRFModel, self).__init__()
+        self.num_encoding_functions = num_encoding_functions
+        self.xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
+        if use_viewdirs is True:
+            self.viewdir_encoding_dims = 3 + 3 * 2 * num_encoding_functions
+        else:
+            self.viewdir_encoding_dims = 0
+        # Input layer (default: 39 -> 128)
+        self.layer1 = torch.nn.Linear(self.xyz_encoding_dims, filter_size)
+        # Layer 2 (default: 128 -> 128)
+        self.layer2 = torch.nn.Linear(filter_size, filter_size)
+        # Layer 3_1 (default: 128 -> 1): Predicts radiance ("sigma")
+        self.layer3_1 = torch.nn.Linear(filter_size, 1)
+        # Layer 3_2 (default: 128 -> 1): Predicts a feature vector (used for color)
+        self.layer3_2 = torch.nn.Linear(filter_size, filter_size)
+
+        # Layer 4 (default: 39 + 128 -> 128)
+        self.layer4 = torch.nn.Linear(self.viewdir_encoding_dims + filter_size, filter_size)
+        # Layer 5 (default: 128 -> 128)
+        self.layer5 = torch.nn.Linear(filter_size, filter_size)
+        # Layer 6 (default: 128 -> 3): Predicts RGB color
+        self.layer6 = torch.nn.Linear(filter_size, 3)
+
+        # Short hand for torch.nn.functional.relu
+        self.relu = torch.nn.functional.relu
+
+
 class FlexibleNeRFModel(torch.nn.Module):
 
     def __init__(self, num_layers=4, hidden_size=128, skip_connect_every=4,
