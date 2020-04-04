@@ -61,6 +61,18 @@ class MultiHeadNeRFModel(torch.nn.Module):
         # Short hand for torch.nn.functional.relu
         self.relu = torch.nn.functional.relu
 
+    def forward(self, x):
+        x, view = x[..., :self.xyz_encoding_dims], x[..., self.xyz_encoding_dims:]
+        x = self.relu(self.layer1(x))
+        x = self.relu(self.layer2(x))
+        sigma = self.layer3_1(x)
+        feat = self.relu(self.layer3_2(x))
+        x = torch.cat((feat, view), dim=-1)
+        x = self.relu(self.layer4(x))
+        x = self.relu(self.layer5(x))
+        x = self.layer6(x)
+        return torch.cat((x, sigma), dim=-1)
+
 
 class FlexibleNeRFModel(torch.nn.Module):
 
