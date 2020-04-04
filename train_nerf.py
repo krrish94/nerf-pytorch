@@ -226,12 +226,17 @@ def main():
 
 
 def cast_to_image(tensor):
+    # Normalize such that coordinates are in [0., 1.]
     if tensor.min() != tensor.max():
         tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    # Scale to range [0., 255.]
     tensor = (tensor * 255).clamp(0., 255.)
+    # Cast to long.
     tensor = tensor.long()
     # Flip to channels first.
     tensor = tensor.permute(2, 0, 1)
+    # BGR -> RGB
+    tensor = tensor[..., [2, 1, 0]]
     return tensor
 
 
