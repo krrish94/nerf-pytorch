@@ -227,13 +227,12 @@ def main():
 
 
 def cast_to_image(tensor):
-    # Input tensor is (H, W, 3)
+    # Input tensor is (H, W, 3). Convert to (3, H, W).
     tensor = tensor.permute(2, 0, 1)
-    print("Tensor:", tensor.shape)
+    # Conver to PIL Image and then np.array (output shape: (H, W, 3))
     img = np.array(torchvision.transforms.ToPILImage()(tensor.detach().cpu()))
-    print("Before:", img.size)
+    # Map back to shape (3, H, W), as tensorboard needs channels first.
     img = np.moveaxis(img, [-1], [0])
-    print("After:", img.shape)
     return img
 
 
