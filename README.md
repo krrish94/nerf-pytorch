@@ -35,6 +35,12 @@ Optionally, if resuming training from a previous checkpoint, run
 python train_nerf.py --config config/default.yml --load-checkpoint path/to/checkpoint.ckpt
 ```
 
+
+## (Full) NeRF on Google Colab
+
+A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can be accessed [here](https://colab.research.google.com/drive/1L6QExI2lw5xhJ-MLlIwpbgf7rxW7fcz3).
+
+
 ## A note on reproducibility
 
 All said, this is not an official code release, and is instead a reproduction from the original code (released by the authors [here](https://github.com/bmild/nerf)).
