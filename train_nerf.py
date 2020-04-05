@@ -6,6 +6,7 @@ import yaml
 import glob
 import numpy as np
 import torch
+import torchvision
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
@@ -204,9 +205,9 @@ def main():
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validataion/psnr", psnr, i)
-                writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]).detach().cpu())
-                writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]).detach().cpu())
-                writer.add_image("validation/img_target", cast_to_image(target_ray_values[..., :3]).detach().cpu())
+                writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]))
+                writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]))
+                writer.add_image("validation/img_target", cast_to_image(target_ray_values[..., :3]))
                 tqdm.write("Validation loss: " + str(loss.item()) + " Validation PSNR: " + str(psnr) + "Time: " + str(time.time() - start))
 
         if i % cfg.experiment.save_every == 0 or i == cfg.experiment.train_iters - 1:
@@ -226,18 +227,14 @@ def main():
 
 
 def cast_to_image(tensor):
-    # Normalize such that coordinates are in [0., 1.]
-    if tensor.min() != tensor.max():
-        tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min())
-    # Scale to range [0., 255.]
-    tensor = (tensor * 255).clamp(0., 255.)
-    # Cast to long.
-    tensor = tensor.long()
-    # Flip to channels first.
+    # Input tensor is (H, W, 3)
     tensor = tensor.permute(2, 0, 1)
-    # BGR -> RGB
-    tensor = tensor[..., [2, 1, 0]]
-    return tensor
+    print("Tensor:", tensor.shape)
+    img = np.array(torchvision.transforms.ToPILImage()(tensor.detach().cpu()))
+    print("Before:", img.size)
+    img = np.moveaxis(img, [-1], [0])
+    print("After:", img.shape)
+    return img
 
 
 if __name__ == "__main__":
