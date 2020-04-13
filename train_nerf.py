@@ -108,7 +108,8 @@ def main():
         num_encoding_fn_xyz=cfg.models.coarse.num_encoding_fn_xyz,
         num_encoding_fn_dir=cfg.models.coarse.num_encoding_fn_dir,
         include_input_xyz=cfg.models.coarse.include_input_xyz,
-        include_input_dir=cfg.models.coarse.include_input_dir
+        include_input_dir=cfg.models.coarse.include_input_dir,
+        use_viewdirs=cfg.models.coarse.use_viewdirs
     )
     model_coarse.to(device)
     # If a fine-resolution model is specified, initialize it.
@@ -118,7 +119,8 @@ def main():
             num_encoding_fn_xyz=cfg.models.fine.num_encoding_fn_xyz,
             num_encoding_fn_dir=cfg.models.fine.num_encoding_fn_dir,
             include_input_xyz=cfg.models.fine.include_input_xyz,
-            include_input_dir=cfg.models.fine.include_input_dir
+            include_input_dir=cfg.models.fine.include_input_dir,
+            use_viewdirs=cfg.models.fine.use_viewdirs
         )
         model_fine.to(device)
 
@@ -159,12 +161,20 @@ def main():
         if USE_CACHED_DATASET:
             datafile = np.random.choice(train_paths)
             cache_dict = torch.load(datafile)
+            ray_bundle = cache_dict["ray_bundle"]
+            ray_origins, ray_directions = ray_bundle[0].reshape((-1, 3)), ray_bundle[1].reshape((-1, 3))
+            target_ray_values = cache_dict["target"][..., :3].reshape((-1, 3))
+            select_inds = np.random.choice(
+                ray_origins.shape[0], size=(cfg.nerf.train.num_random_rays), replace=False
+            )
+            ray_origins, ray_directions = ray_origins[select_inds], ray_directions[select_inds]
+            target_ray_values = target_ray_values[select_inds].to(device)
+            ray_bundle = torch.stack([ray_origins, ray_directions], dim=0).to(device)
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 cache_dict["height"], cache_dict["width"], cache_dict["focal_length"],
-                model_coarse, model_fine, cache_dict["ray_bundle"].to(device), cfg,
+                model_coarse, model_fine, ray_bundle, cfg,
                 mode="train", encode_position_fn=encode_position_fn, encode_direction_fn=encode_direction_fn
             )
-            target_ray_values = cache_dict["target"].to(device)
         else:
             img_idx = np.random.choice(i_train)
             img_target = images[img_idx].to(device)

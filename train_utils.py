@@ -47,40 +47,33 @@ def predict_and_render_radiance(
     bounds = ray_batch[..., 6:8].reshape((-1, 1, 2))
     near, far = bounds[..., 0], bounds[..., 1]
 
-    # # TODO: Use actual values for "near" and "far" (instead of 0. and 1.)
-    # # when not enabling "ndc".
-    # t_vals = torch.linspace(0., 1., getattr(options.nerf, mode).num_coarse).to(ro)
-    # if not getattr(options.nerf, mode).lindisp:
-    #     z_vals = near * (1. - t_vals) + far * t_vals
-    # else:
-    #     z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * t_vals)
-    # z_vals = z_vals.expand([num_rays, getattr(options.nerf, mode).num_coarse])
+    # TODO: Use actual values for "near" and "far" (instead of 0. and 1.)
+    # when not enabling "ndc".
+    t_vals = torch.linspace(0., 1., getattr(options.nerf, mode).num_coarse).to(ro)
+    if not getattr(options.nerf, mode).lindisp:
+        z_vals = near * (1. - t_vals) + far * t_vals
+    else:
+        z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * t_vals)
+    z_vals = z_vals.expand([num_rays, getattr(options.nerf, mode).num_coarse])
 
-    # if getattr(options.nerf, mode).perturb:
-    #     # Get intervals between samples.
-    #     mids = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
-    #     upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
-    #     lower = torch.cat((z_vals[..., :1], mids), dim=-1)
-    #     # Stratified samples in those intervals.
-    #     t_rand = torch.rand(z_vals.shape).to(ro)
-    #     z_vals = lower + (upper - lower) * t_rand
-    # # pts -> (num_rays, N_samples, 3)
-    # pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
-
-    # # encode_position_fn = eval(options.nerf.encode_position_fn)
-    # # encode_direction_fn = eval(options.nerf.encode_direction_fn)
-    # # if options.nerf.encode_position_fn == "positional_encoding":
-    # #     encode_position_fn = positional_encoding
-    # # if options.nerf.encode_direction_fn == "positional_encoding":
-    # #     encode_direction_fn = positional_encoding
-
-    num_coarse = getattr(options.nerf, mode).num_coarse
-    far_ = far[0].item()
-    near_ = near[0].item()
-    z_vals = torch.linspace(near_, far_, num_coarse).to(ro)
-    noise_shape = list(ro.shape[:-1]) + [num_coarse]
-    z_vals = z_vals + torch.rand(noise_shape).to(ro) * (far_ - near_) / num_coarse
+    if getattr(options.nerf, mode).perturb:
+        # Get intervals between samples.
+        mids = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
+        upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
+        lower = torch.cat((z_vals[..., :1], mids), dim=-1)
+        # Stratified samples in those intervals.
+        t_rand = torch.rand(z_vals.shape).to(ro)
+        z_vals = lower + (upper - lower) * t_rand
+    # pts -> (num_rays, N_samples, 3)
     pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
+
+    # num_coarse = getattr(options.nerf, mode).num_coarse
+    # far_ = options.dataset.far
+    # near_ = options.dataset.near
+    # z_vals = torch.linspace(near_, far_, num_coarse).to(ro)
+    # noise_shape = list(ro.shape[:-1]) + [num_coarse]
+    # z_vals = z_vals + torch.rand(noise_shape).to(ro) * (far_ - near_) / num_coarse
+    # pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
 
     radiance_field = run_network(model_coarse,
                                  pts,
@@ -146,11 +139,17 @@ def run_one_iter_of_nerf(
         viewdirs = viewdirs / viewdirs.norm(p=2, dim=-1).unsqueeze(-1)
         viewdirs = viewdirs.reshape((-1, 3))
     ray_shapes = ray_directions.shape  # Cache now, to restore later.
-    ro, rd = ndc_rays(H, W, focal, 1., ray_origins, ray_directions)
-    ro = ro.reshape((-1, 3))
-    rd = rd.reshape((-1, 3))
-    near = options.nerf.near * torch.ones_like(rd[..., :1])
-    far = options.nerf.far * torch.ones_like(rd[..., :1])
+    if options.dataset.no_ndc is False:
+        ro, rd = ndc_rays(H, W, focal, 1., ray_origins, ray_directions)
+        ro = ro.reshape((-1, 3))
+        rd = rd.reshape((-1, 3))
+    else:
+        ro = ray_origins.reshape((-1, 3))
+        rd = ray_directions.reshape((-1, 3))
+    # near = options.nerf.near * torch.ones_like(rd[..., :1])
+    # far = options.nerf.far * torch.ones_like(rd[..., :1])
+    near = options.dataset.near * torch.ones_like(rd[..., :1])
+    far = options.dataset.far * torch.ones_like(rd[..., :1])
     rays = torch.cat((ro, rd, near, far), dim=-1)
     if options.nerf.use_viewdirs:
         rays = torch.cat((rays, viewdirs), dim=-1)

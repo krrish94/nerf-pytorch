@@ -13,6 +13,9 @@ def img2mse(img_src, img_tgt):
 
 
 def mse2psnr(mse):
+    # For numerical stability, avoid a zero mse loss.
+    if mse == 0:
+        mse = 1e-5
     return -10. * math.log10(mse)
 
 
