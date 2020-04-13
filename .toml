@@ -11,8 +11,9 @@ exclude = '''
   | _build
   | buck-out
   | build
-  | cuda
+  | cache
   | dist
+  | logs
   | tests
 )/
 '''
