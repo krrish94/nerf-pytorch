@@ -13,11 +13,10 @@ import importlib.util
 import io
 import logging
 import os
-from typing import Optional
-import yaml
-
 from ast import literal_eval
+from typing import Optional
 
+import yaml
 
 # File exts for yaml
 _YAML_EXTS = {"", ".yml", ".yaml"}

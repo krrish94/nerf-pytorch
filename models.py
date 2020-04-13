@@ -14,7 +14,9 @@ class VeryTinyNeRFModel(torch.nn.Module):
         else:
             self.viewdir_encoding_dims = 0
         # Input layer (default: 65 -> 128)
-        self.layer1 = torch.nn.Linear(self.xyz_encoding_dims + self.viewdir_encoding_dims, filter_size)
+        self.layer1 = torch.nn.Linear(
+            self.xyz_encoding_dims + self.viewdir_encoding_dims, filter_size
+        )
         # Layer 2 (default: 128 -> 128)
         self.layer2 = torch.nn.Linear(filter_size, filter_size)
         # Layer 3 (default: 128 -> 4)
@@ -52,7 +54,9 @@ class MultiHeadNeRFModel(torch.nn.Module):
         self.layer3_2 = torch.nn.Linear(hidden_size, hidden_size)
 
         # Layer 4 (default: 39 + 128 -> 128)
-        self.layer4 = torch.nn.Linear(self.viewdir_encoding_dims + hidden_size, hidden_size)
+        self.layer4 = torch.nn.Linear(
+            self.viewdir_encoding_dims + hidden_size, hidden_size
+        )
         # Layer 5 (default: 128 -> 128)
         self.layer5 = torch.nn.Linear(hidden_size, hidden_size)
         # Layer 6 (default: 128 -> 3): Predicts RGB color
@@ -62,7 +66,7 @@ class MultiHeadNeRFModel(torch.nn.Module):
         self.relu = torch.nn.functional.relu
 
     def forward(self, x):
-        x, view = x[..., :self.xyz_encoding_dims], x[..., self.xyz_encoding_dims:]
+        x, view = x[..., : self.xyz_encoding_dims], x[..., self.xyz_encoding_dims :]
         x = self.relu(self.layer1(x))
         x = self.relu(self.layer2(x))
         sigma = self.layer3_1(x)
@@ -80,12 +84,17 @@ class ReplicateNeRFModel(torch.nn.Module):
     """
 
     def __init__(
-            self, hidden_size=256, num_layers=4, num_encoding_fn_xyz=6,
-            num_encoding_fn_dir=4, include_input_xyz=True, include_input_dir=True
+        self,
+        hidden_size=256,
+        num_layers=4,
+        num_encoding_fn_xyz=6,
+        num_encoding_fn_dir=4,
+        include_input_xyz=True,
+        include_input_dir=True,
     ):
         super(ReplicateNeRFModel, self).__init__()
         # xyz_encoding_dims = 3 + 3 * 2 * num_encoding_functions
-        
+
         self.dim_xyz = (3 if include_input_xyz else 0) + 2 * 3 * num_encoding_fn_xyz
         self.dim_dir = (3 if include_input_dir else 0) + 2 * 3 * num_encoding_fn_dir
 
@@ -98,9 +107,9 @@ class ReplicateNeRFModel(torch.nn.Module):
         self.layer5 = torch.nn.Linear(hidden_size // 2, hidden_size // 2)
         self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
         self.relu = torch.nn.functional.relu
-    
+
     def forward(self, x):
-        xyz, direction = x[..., :self.dim_xyz], x[..., self.dim_xyz:]
+        xyz, direction = x[..., : self.dim_xyz], x[..., self.dim_xyz :]
         x_ = self.relu(self.layer1(xyz))
         x_ = self.relu(self.layer2(x_))
         feat = self.layer3(x_)
@@ -112,11 +121,16 @@ class ReplicateNeRFModel(torch.nn.Module):
 
 
 class FlexibleNeRFModel(torch.nn.Module):
-
     def __init__(
-        self, num_layers=4, hidden_size=128, skip_connect_every=4,
-        num_encoding_fn_xyz=6, num_encoding_fn_dir=4, include_input_xyz=True,
-        include_input_dir=True, use_viewdirs=True
+        self,
+        num_layers=4,
+        hidden_size=128,
+        skip_connect_every=4,
+        num_encoding_fn_xyz=6,
+        num_encoding_fn_dir=4,
+        include_input_xyz=True,
+        include_input_dir=True,
+        use_viewdirs=True,
     ):
         super(FlexibleNeRFModel, self).__init__()
 
@@ -136,15 +150,15 @@ class FlexibleNeRFModel(torch.nn.Module):
                     torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
                 )
             else:
-                self.layers_xyz.append(
-                    torch.nn.Linear(hidden_size, hidden_size)
-                )
+                self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
 
         self.use_viewdirs = use_viewdirs
         if self.use_viewdirs:
             self.layers_dir = torch.nn.ModuleList()
             # This deviates from the original paper, and follows the code release instead.
-            self.layers_dir.append(torch.nn.Linear(self.dim_dir + hidden_size, hidden_size // 2))
+            self.layers_dir.append(
+                torch.nn.Linear(self.dim_dir + hidden_size, hidden_size // 2)
+            )
 
             self.fc_alpha = torch.nn.Linear(hidden_size, 1)
             self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
@@ -156,12 +170,16 @@ class FlexibleNeRFModel(torch.nn.Module):
 
     def forward(self, x):
         if self.use_viewdirs:
-            xyz, view = x[..., :self.dim_xyz], x[..., self.dim_xyz:]
+            xyz, view = x[..., : self.dim_xyz], x[..., self.dim_xyz :]
         else:
-            xyz = x[..., :self.dim_xyz]
+            xyz = x[..., : self.dim_xyz]
         x = self.layer1(xyz)
         for i in range(len(self.layers_xyz)):
-            if i % self.skip_connect_every == 0 and i > 0 and i != len(self.linear_layers) - 1:
+            if (
+                i % self.skip_connect_every == 0
+                and i > 0
+                and i != len(self.linear_layers) - 1
+            ):
                 x = torch.cat((x, xyz), dim=-1)
             x = self.relu(self.layers_xyz[i](x))
         if self.use_viewdirs:

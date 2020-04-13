@@ -1,15 +1,13 @@
+import os
 from typing import Optional
 
-import os
-
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from tqdm import tqdm, trange
-import matplotlib.pyplot as plt
 
-
-from nerf_helpers import cumprod_exclusive, get_minibatches
-from nerf_helpers import get_ray_bundle, positional_encoding
+from nerf_helpers import (cumprod_exclusive, get_minibatches, get_ray_bundle,
+                          positional_encoding)
 
 
 def compute_query_points_from_rays(
@@ -18,7 +16,7 @@ def compute_query_points_from_rays(
     near_thresh: float,
     far_thresh: float,
     num_samples: int,
-    randomize: Optional[bool] = True
+    randomize: Optional[bool] = True,
 ) -> (torch.Tensor, torch.Tensor):
     r"""Compute query 3D points given the "bundle" of rays. The near_thresh and far_thresh
     variables indicate the bounds within which 3D points are to be sampled.
@@ -52,20 +50,24 @@ def compute_query_points_from_rays(
         # noise_shape = (width, height, num_samples)
         noise_shape = list(ray_origins.shape[:-1]) + [num_samples]
         # depth_values: (num_samples)
-        depth_values = depth_values \
-            + torch.rand(noise_shape).to(ray_origins) * (far_thresh
-                - near_thresh) / num_samples
+        depth_values = (
+            depth_values
+            + torch.rand(noise_shape).to(ray_origins)
+            * (far_thresh - near_thresh)
+            / num_samples
+        )
     # (width, height, num_samples, 3) = (width, height, 1, 3) + (width, height, 1, 3) * (num_samples, 1)
     # query_points:  (width, height, num_samples, 3)
-    query_points = ray_origins[..., None, :] + ray_directions[..., None, :] * depth_values[..., :, None]
+    query_points = (
+        ray_origins[..., None, :]
+        + ray_directions[..., None, :] * depth_values[..., :, None]
+    )
     # TODO: Double-check that `depth_values` returned is of shape `(num_samples)`.
     return query_points, depth_values
 
 
 def render_volume_density(
-    radiance_field: torch.Tensor,
-    ray_origins: torch.Tensor,
-    depth_values: torch.Tensor
+    radiance_field: torch.Tensor, ray_origins: torch.Tensor, depth_values: torch.Tensor
 ) -> (torch.Tensor, torch.Tensor, torch.Tensor):
     r"""Differentiably renders a radiance field, given the origin of each ray in the
     "bundle", and the sampled depth values along them.
@@ -89,10 +91,15 @@ def render_volume_density(
     sigma_a = torch.nn.functional.relu(radiance_field[..., 3])
     rgb = torch.sigmoid(radiance_field[..., :3])
     one_e_10 = torch.tensor([1e10], dtype=ray_origins.dtype, device=ray_origins.device)
-    dists = torch.cat((depth_values[..., 1:] - depth_values[..., :-1],
-                  one_e_10.expand(depth_values[..., :1].shape)), dim=-1)
-    alpha = 1. - torch.exp(-sigma_a * dists)
-    weights = alpha * cumprod_exclusive(1. - alpha + 1e-10)
+    dists = torch.cat(
+        (
+            depth_values[..., 1:] - depth_values[..., :-1],
+            one_e_10.expand(depth_values[..., :1].shape),
+        ),
+        dim=-1,
+    )
+    alpha = 1.0 - torch.exp(-sigma_a * dists)
+    weights = alpha * cumprod_exclusive(1.0 - alpha + 1e-10)
 
     rgb_map = (weights[..., None] * rgb).sum(dim=-2)
     depth_map = (weights * depth_values).sum(dim=-1)
@@ -102,18 +109,29 @@ def render_volume_density(
 
 
 # One iteration of TinyNeRF (forward pass).
-def run_one_iter_of_tinynerf(height, width, focal_length, tform_cam2world,
-                             near_thresh, far_thresh, depth_samples_per_ray,
-                             encoding_function, get_minibatches_function, chunksize,
-                             model, encoding_function_args):
-  
+def run_one_iter_of_tinynerf(
+    height,
+    width,
+    focal_length,
+    tform_cam2world,
+    near_thresh,
+    far_thresh,
+    depth_samples_per_ray,
+    encoding_function,
+    get_minibatches_function,
+    chunksize,
+    model,
+    encoding_function_args,
+):
+
     # Get the "bundle" of rays through all image pixels.
-    ray_origins, ray_directions = get_ray_bundle(height, width, focal_length,
-                                               tform_cam2world)
+    ray_origins, ray_directions = get_ray_bundle(
+        height, width, focal_length, tform_cam2world
+    )
 
     # Sample query points along each ray
     query_points, depth_values = compute_query_points_from_rays(
-      ray_origins, ray_directions, near_thresh, far_thresh, depth_samples_per_ray
+        ray_origins, ray_directions, near_thresh, far_thresh, depth_samples_per_ray
     )
 
     # "Flatten" the query points.
@@ -135,7 +153,9 @@ def run_one_iter_of_tinynerf(height, width, focal_length, tform_cam2world,
     radiance_field = torch.reshape(radiance_field_flattened, unflattened_shape)
 
     # Perform differentiable volume rendering to re-synthesize the RGB image.
-    rgb_predicted, _, _ = render_volume_density(radiance_field, ray_origins, depth_values)
+    rgb_predicted, _, _ = render_volume_density(
+        radiance_field, ray_origins, depth_values
+    )
 
     return rgb_predicted
 
@@ -170,13 +190,13 @@ def main():
     # Log directory
     logdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cache", "log")
     os.makedirs(logdir, exist_ok=True)
-    
+
     """
     Load input images and poses
     """
 
     data = np.load("cache/tiny_nerf_data.npz")
-    
+
     # Images
     images = data["images"]
     # Camera extrinsics (poses)
@@ -190,8 +210,8 @@ def main():
     height, width = images.shape[1:3]
 
     # Near and far clipping thresholds for depth values.
-    near_thresh = 2.
-    far_thresh = 6.
+    near_thresh = 2.0
+    far_thresh = 6.0
 
     # Hold one image out (for test).
     testimg, testpose = images[101], tform_cam2world[101]
@@ -204,7 +224,7 @@ def main():
     Parameters for TinyNeRF training
     """
 
-    # Number of functions used in the positional encoding (Be sure to update the 
+    # Number of functions used in the positional encoding (Be sure to update the
     # model if this number changes).
     num_encoding_functions = 10
     # Specify encoding function.
@@ -224,7 +244,7 @@ def main():
     num_iters = 5000
 
     # Misc parameters
-    display_every = 100  # Number of iters after which stats are 
+    display_every = 100  # Number of iters after which stats are
 
     """
     Model
@@ -258,11 +278,20 @@ def main():
         target_tform_cam2world = tform_cam2world[target_img_idx].to(device)
 
         # Run one iteration of TinyNeRF and get the rendered RGB image.
-        rgb_predicted = run_one_iter_of_tinynerf(height, width, focal_length,
-                                                 target_tform_cam2world, near_thresh,
-                                                 far_thresh, depth_samples_per_ray,
-                                                 encode, get_minibatches, chunksize,
-                                                 model, num_encoding_functions)
+        rgb_predicted = run_one_iter_of_tinynerf(
+            height,
+            width,
+            focal_length,
+            target_tform_cam2world,
+            near_thresh,
+            far_thresh,
+            depth_samples_per_ray,
+            encode,
+            get_minibatches,
+            chunksize,
+            model,
+            num_encoding_functions,
+        )
 
         # Compute mean-squared error between the predicted and target images. Backprop!
         loss = torch.nn.functional.mse_loss(rgb_predicted, target_img)
@@ -273,14 +302,23 @@ def main():
         # Display images/plots/stats
         if i % display_every == 0 or i == num_iters - 1:
             # Render the held-out view
-            rgb_predicted = run_one_iter_of_tinynerf(height, width, focal_length,
-                                                     testpose, near_thresh,
-                                                     far_thresh, depth_samples_per_ray,
-                                                     encode, get_minibatches, chunksize,
-                                                     model, num_encoding_functions)
+            rgb_predicted = run_one_iter_of_tinynerf(
+                height,
+                width,
+                focal_length,
+                testpose,
+                near_thresh,
+                far_thresh,
+                depth_samples_per_ray,
+                encode,
+                get_minibatches,
+                chunksize,
+                model,
+                num_encoding_functions,
+            )
             loss = torch.nn.functional.mse_loss(rgb_predicted, target_img)
             tqdm.write("Loss: " + str(loss.item()))
-            psnr = -10. * torch.log10(loss)
+            psnr = -10.0 * torch.log10(loss)
 
             psnrs.append(psnr.item())
             iternums.append(i)
@@ -302,7 +340,7 @@ def main():
             # plt.title("PSNR")
             # plt.show()
 
-    print('Done!')
+    print("Done!")
 
 
 if __name__ == "__main__":
