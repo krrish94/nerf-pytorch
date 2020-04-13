@@ -1,0 +1,10 @@
+glob
+imageio
+numpy
+python-opencv-headless
+pyyaml
+tensorboard
+torch>1.3.0
+torchvision
+tqdm
+-e git://github.com/aliutkus/torchsearchsorted#egg=torchsearchsorted
