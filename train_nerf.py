@@ -16,6 +16,7 @@ from load_blender import load_blender_data
 from metrics import ScalarMetric
 from nerf_helpers import get_minibatches, get_ray_bundle
 from nerf_helpers import img2mse, meshgrid_xy, mse2psnr
+from nerf_helpers import positional_encoding
 from train_utils import predict_and_render_radiance
 from train_utils import eval_nerf
 from train_utils import run_network, run_one_iter_of_nerf
@@ -77,13 +78,50 @@ def main():
     else:
         device = "cpu"
 
+    # # Encoding function for position (xyz).
+    # encode_position_fn = lambda x: positional_encoding(
+    #     x, num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
+    #     include_input=cfg.models.coarse.include_input_xyz
+    # )
+    # # Encoding function for direction.
+    # encode_direction_fn = lambda x: positional_encoding(
+    #     x, num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
+    #     include_input=cfg.models.coarse.include_input_dir
+    # )
+
+    def encode_position_fn(x):
+        return positional_encoding(
+            x,
+            num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
+            include_input=cfg.models.coarse.include_input_xyz
+        )
+    
+    def encode_direction_fn(x):
+        return positional_encoding(
+            x,
+            num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
+            include_input=cfg.models.coarse.include_input_dir
+        )
+
     # Initialize a coarse-resolution model.
-    model_coarse = getattr(models, cfg.models.coarse.type)()
+    model_coarse = getattr(models, cfg.models.coarse.type)(
+        num_encoding_fn_xyz=cfg.models.coarse.num_encoding_fn_xyz,
+        num_encoding_fn_dir=cfg.models.coarse.num_encoding_fn_dir,
+        include_input_xyz=cfg.models.coarse.include_input_xyz,
+        include_input_dir=cfg.models.coarse.include_input_dir,
+        use_viewdirs=cfg.models.coarse.use_viewdirs
+    )
     model_coarse.to(device)
     # If a fine-resolution model is specified, initialize it.
     model_fine = None
     if hasattr(cfg.models, "fine"):
-        model_fine = getattr(models, cfg.models.fine.type)()
+        model_fine = getattr(models, cfg.models.fine.type)(
+            num_encoding_fn_xyz=cfg.models.fine.num_encoding_fn_xyz,
+            num_encoding_fn_dir=cfg.models.fine.num_encoding_fn_dir,
+            include_input_xyz=cfg.models.fine.include_input_xyz,
+            include_input_dir=cfg.models.fine.include_input_dir,
+            use_viewdirs=cfg.models.fine.use_viewdirs
+        )
         model_fine.to(device)
 
     # Initialize optimizer.
@@ -123,12 +161,20 @@ def main():
         if USE_CACHED_DATASET:
             datafile = np.random.choice(train_paths)
             cache_dict = torch.load(datafile)
+            ray_bundle = cache_dict["ray_bundle"]
+            ray_origins, ray_directions = ray_bundle[0].reshape((-1, 3)), ray_bundle[1].reshape((-1, 3))
+            target_ray_values = cache_dict["target"][..., :3].reshape((-1, 3))
+            select_inds = np.random.choice(
+                ray_origins.shape[0], size=(cfg.nerf.train.num_random_rays), replace=False
+            )
+            ray_origins, ray_directions = ray_origins[select_inds], ray_directions[select_inds]
+            target_ray_values = target_ray_values[select_inds].to(device)
+            ray_bundle = torch.stack([ray_origins, ray_directions], dim=0).to(device)
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 cache_dict["height"], cache_dict["width"], cache_dict["focal_length"],
-                model_coarse, model_fine, cache_dict["ray_bundle"].to(device), cfg,
-                mode="train"
+                model_coarse, model_fine, ray_bundle, cfg,
+                mode="train", encode_position_fn=encode_position_fn, encode_direction_fn=encode_direction_fn
             )
-            target_ray_values = cache_dict["target"].to(device)
         else:
             img_idx = np.random.choice(i_train)
             img_target = images[img_idx].to(device)
@@ -147,7 +193,8 @@ def main():
             target_s = img_target[select_inds[:, 0], select_inds[:, 1], :]
             
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
-                H, W, focal, model_coarse, model_fine, batch_rays, cfg, mode="train"
+                H, W, focal, model_coarse, model_fine, batch_rays, cfg, mode="train",
+                encode_position_fn=encode_position_fn, encode_direction_fn=encode_direction_fn
             )
             target_ray_values = target_s
 
@@ -168,6 +215,9 @@ def main():
         if i % cfg.experiment.print_every == 0 or i == cfg.experiment.train_iters - 1:
             tqdm.write("[TRAIN] Iter: " + str(i) + " Loss: " + str(loss.item()) + " PSNR: " + str(psnr))
         writer.add_scalar("train/loss", loss.item(), i)
+        writer.add_scalar("train/coarse_loss", coarse_loss.item(), i)
+        if rgb_fine is not None:
+            writer.add_scalar("train/fine_loss", fine_loss.item(), i)
         writer.add_scalar("train/psnr", psnr, i)
 
         # Validation
@@ -187,7 +237,9 @@ def main():
                     rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
                         cache_dict["height"], cache_dict["width"], cache_dict["focal_length"],
                         model_coarse, model_fine, cache_dict["ray_origins"].to(device),
-                        cache_dict["ray_directions"].to(device), cfg, mode="train"
+                        cache_dict["ray_directions"].to(device), cfg, mode="validation",
+                        encode_position_fn=encode_position_fn,
+                        encode_direction_fn=encode_direction_fn,
                     )
                     target_ray_values = cache_dict["target"].to(device)
                 else:
@@ -196,17 +248,25 @@ def main():
                     pose_target = poses[img_idx, :3, :4].to(device)
                     ray_origins, ray_directions = get_ray_bundle(H, W, focal, pose_target)
                     rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
-                        H, W, focal, model_coarse, model_fine, ray_origins, ray_directions, cfg
+                        H, W, focal, model_coarse, model_fine, ray_origins, ray_directions, cfg,
+                        mode="validation",
+                        encode_position_fn=encode_position_fn,
+                        encode_direction_fn=encode_direction_fn
                     )
                     target_ray_values = img_target
                 coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
-                fine_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
+                fine_loss = 0.
+                if rgb_fine is not None:
+                    fine_loss = img2mse(rgb_fine[..., :3], target_ray_values[..., :3])
                 loss = coarse_loss + fine_loss
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
+                writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
                 writer.add_scalar("validataion/psnr", psnr, i)
                 writer.add_image("validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]))
-                writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]))
+                if rgb_fine is not None:
+                    writer.add_image("validation/rgb_fine", cast_to_image(rgb_fine[..., :3]))
+                    writer.add_scalar("validation/fine_loss", fine_loss.item(), i)
                 writer.add_image("validation/img_target", cast_to_image(target_ray_values[..., :3]))
                 tqdm.write("Validation loss: " + str(loss.item()) + " Validation PSNR: " + str(psnr) + "Time: " + str(time.time() - start))
 
