@@ -1,7 +1,8 @@
 import torch
 
 from nerf_helpers import get_minibatches, get_ray_bundle
-from nerf_helpers import ndc_rays, positional_encoding, sample_pdf
+from nerf_helpers import ndc_rays, positional_encoding
+from nerf_helpers import sample_pdf_2 as sample_pdf
 from volume_rendering_utils import volume_render_radiance_field
 
 
@@ -26,39 +27,60 @@ def run_network(network_fn, pts, ray_batch, chunksize, embed_fn,
     return radiance_field
 
 
-def predict_and_render_radiance(ray_batch, model_coarse, model_fine, options, mode="train"):
+def identity_encoding(x):
+    return x
+
+
+def predict_and_render_radiance(
+    ray_batch, model_coarse, model_fine, options, mode="train",
+    encode_position_fn=None, encode_direction_fn=None
+):
     # TESTED
+
+    if encode_position_fn is None:
+        encode_position_fn = identity_encoding
+    if encode_direction_fn is None:
+        encode_direction_fn = identity_encoding
+
     num_rays = ray_batch.shape[0]
     ro, rd = ray_batch[..., :3], ray_batch[..., 3:6]
     bounds = ray_batch[..., 6:8].reshape((-1, 1, 2))
     near, far = bounds[..., 0], bounds[..., 1]
 
-    # TODO: Use actual values for "near" and "far" (instead of 0. and 1.)
-    # when not enabling "ndc".
-    t_vals = torch.linspace(0., 1., getattr(options.nerf, mode).num_coarse).to(ro)
-    if not getattr(options.nerf, mode).lindisp:
-        z_vals = near * (1. - t_vals) + far * t_vals
-    else:
-        z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * t_vals)
-    z_vals = z_vals.expand([num_rays, getattr(options.nerf, mode).num_coarse])
+    # # TODO: Use actual values for "near" and "far" (instead of 0. and 1.)
+    # # when not enabling "ndc".
+    # t_vals = torch.linspace(0., 1., getattr(options.nerf, mode).num_coarse).to(ro)
+    # if not getattr(options.nerf, mode).lindisp:
+    #     z_vals = near * (1. - t_vals) + far * t_vals
+    # else:
+    #     z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * t_vals)
+    # z_vals = z_vals.expand([num_rays, getattr(options.nerf, mode).num_coarse])
 
-    if getattr(options.nerf, mode).perturb:
-        # Get intervals between samples.
-        mids = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
-        upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
-        lower = torch.cat((z_vals[..., :1], mids), dim=-1)
-        # Stratified samples in those intervals.
-        t_rand = torch.rand(z_vals.shape).to(ro)
-        z_vals = lower + (upper - lower) * t_rand
-    # pts -> (num_rays, N_samples, 3)
+    # if getattr(options.nerf, mode).perturb:
+    #     # Get intervals between samples.
+    #     mids = 0.5 * (z_vals[..., 1:] + z_vals[..., :-1])
+    #     upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
+    #     lower = torch.cat((z_vals[..., :1], mids), dim=-1)
+    #     # Stratified samples in those intervals.
+    #     t_rand = torch.rand(z_vals.shape).to(ro)
+    #     z_vals = lower + (upper - lower) * t_rand
+    # # pts -> (num_rays, N_samples, 3)
+    # pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
+
+    # # encode_position_fn = eval(options.nerf.encode_position_fn)
+    # # encode_direction_fn = eval(options.nerf.encode_direction_fn)
+    # # if options.nerf.encode_position_fn == "positional_encoding":
+    # #     encode_position_fn = positional_encoding
+    # # if options.nerf.encode_direction_fn == "positional_encoding":
+    # #     encode_direction_fn = positional_encoding
+
+    num_coarse = getattr(options.nerf, mode).num_coarse
+    far_ = far[0].item()
+    near_ = near[0].item()
+    z_vals = torch.linspace(near_, far_, num_coarse).to(ro)
+    noise_shape = list(ro.shape[:-1]) + [num_coarse]
+    z_vals = z_vals + torch.rand(noise_shape).to(ro) * (far_ - near_) / num_coarse
     pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
-
-    encode_position_fn = None
-    encode_direction_fn = None
-    if options.nerf.encode_position_fn == "positional_encoding":
-        encode_position_fn = positional_encoding
-    if options.nerf.encode_direction_fn == "positional_encoding":
-        encode_direction_fn = positional_encoding
 
     radiance_field = run_network(model_coarse,
                                  pts,
@@ -106,10 +128,18 @@ def predict_and_render_radiance(ray_batch, model_coarse, model_fine, options, mo
     return rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine
 
 
-def run_one_iter_of_nerf(H, W, focal, model_coarse, model_fine, batch_rays,
-                         options, mode="train"):
+def run_one_iter_of_nerf(
+    H, W, focal, model_coarse, model_fine, batch_rays, options, mode="train",
+    encode_position_fn=None, encode_direction_fn=None
+):
+    if encode_position_fn is None:
+        encode_position_fn = identity_encoding
+    if encode_direction_fn is None:
+        encode_direction_fn = identity_encoding
+
     ray_origins = batch_rays[0]
     ray_directions = batch_rays[1]
+    viewdirs = None
     if options.nerf.use_viewdirs:
         # Provide ray directions as input
         viewdirs = ray_directions
@@ -132,7 +162,9 @@ def run_one_iter_of_nerf(H, W, focal, model_coarse, model_fine, batch_rays,
     rgb_fine, disp_fine, acc_fine = None, None, None
     for batch in batches:
         rc, dc, ac, rf, df, af = predict_and_render_radiance(
-            batch, model_coarse, model_fine, options
+            batch, model_coarse, model_fine, options,
+            encode_position_fn=encode_position_fn,
+            encode_direction_fn=encode_direction_fn
         )
         rgb_coarse.append(rc)
         disp_coarse.append(dc)
@@ -173,18 +205,25 @@ def run_one_iter_of_nerf(H, W, focal, model_coarse, model_fine, batch_rays,
 
 
 def eval_nerf(height, width, focal_length, model_coarse, model_fine,
-              ray_origins, ray_directions, options, mode="validation"):
+              ray_origins, ray_directions, options, mode="validation",
+              encode_position_fn=None, encode_direction_fn=None):
     r"""Evaluate a NeRF by synthesizing a full image (as opposed to train mode, where
     only a handful of rays/pixels are synthesized).
     """
+    if encode_position_fn is None:
+        encode_position_fn = identity_encoding
+    if encode_direction_fn is None:
+        encode_direction_fn = identity_encoding
     original_shape = ray_origins.shape
     ray_origins = ray_origins.reshape((1, -1, 3))
     ray_directions = ray_directions.reshape((1, -1, 3))
     batch_rays = torch.cat((ray_origins, ray_directions), dim=0)
     rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
-        height, width, focal_length, model_coarse, model_fine, batch_rays, options, mode="validation"
+        height, width, focal_length, model_coarse, model_fine, batch_rays, options, mode="validation",
+        encode_position_fn=encode_position_fn, encode_direction_fn=encode_direction_fn
     )
     rgb_coarse = rgb_coarse.reshape(original_shape)
-    rgb_fine = rgb_fine.reshape(original_shape)
+    if rgb_fine is not None:
+        rgb_fine = rgb_fine.reshape(original_shape)
 
     return rgb_coarse, None, None, rgb_fine, None, None

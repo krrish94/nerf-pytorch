@@ -95,20 +95,24 @@ def get_ray_bundle(height: int, width: int, focal_length: float, tform_cam2world
     return ray_origins, ray_directions
 
 
-def positional_encoding(tensor, num_encoding_functions=6) -> torch.Tensor:
+def positional_encoding(
+    tensor, num_encoding_functions=6, include_input=True
+) -> torch.Tensor:
     r"""Apply positional encoding to the input.
 
     Args:
-    tensor (torch.Tensor): Input tensor to be positionally encoded.
-    encoding_size (optional, int): Number of encoding functions used to compute
-      a positional encoding (default: 6).
+        tensor (torch.Tensor): Input tensor to be positionally encoded.
+        encoding_size (optional, int): Number of encoding functions used to compute
+            a positional encoding (default: 6).
+        include_input (optional, bool): Whether or not to include the input in the
+            positional encoding (default: True).
 
     Returns:
     (torch.Tensor): Positional encoding of the input tensor.
     """
     # TESTED
     # Trivially, the input tensor is added to the positional encoding.
-    encoding = [tensor]
+    encoding = [tensor] if include_input else []
     # Now, encode the input using a set of high-frequency functions and append the
     # resulting values to the encoding.
     for i in range(num_encoding_functions):
@@ -185,6 +189,43 @@ def sample_pdf(bins, weights, num_samples, det=False):
     denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
     t = (u - cdf_g[..., 0]) / denom
     samples = bins_g[..., 0] + t * (bins_g[..., 1] - bins_g[..., 0])
+
+    return samples
+
+
+def sample_pdf_2(bins, weights, num_samples, det=False):
+    r"""sample_pdf function from another concurrent pytorch implementation
+    by yenchenlin (https://github.com/yenchenlin/nerf-pytorch).
+    """
+
+    weights = weights + 1e-5
+    pdf = weights / torch.sum(weights, -1, keepdim=True)
+    cdf = torch.cumsum(pdf, -1)
+    cdf = torch.cat([torch.zeros_like(cdf[...,:1]), cdf], -1)  # (batchsize, len(bins))
+
+    # Take uniform samples
+    if det:
+        u = torch.linspace(0., 1., steps=num_samples)
+        u = u.expand(list(cdf.shape[:-1]) + [num_samples])
+    else:
+        u = torch.rand(list(cdf.shape[:-1]) + [num_samples]).to(weights)
+
+    # Invert CDF
+    u = u.contiguous()
+    cdf = cdf.contiguous()
+    inds = torchsearchsorted.searchsorted(cdf, u, side="right")
+    below = torch.max(torch.zeros_like(inds - 1), inds - 1)
+    above = torch.min(cdf.shape[-1] - 1 * torch.ones_like(inds), inds)
+    inds_g = torch.stack([below, above], dim=-1)  # (batchsize, num_samples, 2)
+
+    matched_shape = [inds_g.shape[0], inds_g.shape[1], cdf.shape[-1]]
+    cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, inds_g)
+    bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, inds_g)
+
+    denom = (cdf_g[...,1]-cdf_g[...,0])
+    denom = torch.where(denom<1e-5, torch.ones_like(denom), denom)
+    t = (u-cdf_g[...,0])/denom
+    samples = bins_g[...,0] + t * (bins_g[...,1]-bins_g[...,0])
 
     return samples
 
