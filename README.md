@@ -19,7 +19,7 @@ https://colab.research.google.com/drive/1rO8xo0TemN67d4mTpakrKrLp03b9bgCX
 ## How to train your NeRF
 
 To train a "full" NeRF model (i.e., using 3D coordinates as well as ray directions, and the hierarchical sampling procedure), first setup dependencies. In a new `conda` or `virtualenv` environment, run
-```
+```bash
 pip install requirements.txt
 ```
 
@@ -28,12 +28,12 @@ pip install requirements.txt
 Once everything is setup, to run experiments, first edit `config/lego.yml` to specify your own parameters.
 
 The training script can be invoked by running
-```
+```bash
 python train_nerf.py --config config/lego.yml
 ```
 
 Optionally, if resuming training from a previous checkpoint, run
-```
+```bash
 python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt
 ```
 
@@ -41,6 +41,19 @@ python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoi
 ## (Full) NeRF on Google Colab
 
 A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can be accessed [here](https://colab.research.google.com/drive/1L6QExI2lw5xhJ-MLlIwpbgf7rxW7fcz3).
+
+
+## Render fun videos
+
+Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that.
+```bash
+python eval_nerf.py --config logs/experiment_id/config.yml --checkpoint logs/experiment_id/checkpoint100000.ckpt --savedir cache/rendered/experiment_id
+```
+
+You can create a `gif` out of the saved images, for instance, by using [Imagemagick](https://imagemagick.org/).
+```bash
+convert cache/rendered/experiment_id/*.png cache/rendered/experiment_id.gif
+```
 
 
 ## A note on reproducibility
