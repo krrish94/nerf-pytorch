@@ -18,8 +18,13 @@ import models
 from cfgnode import CfgNode
 from lieutils import SE3
 from load_blender import load_blender_data
-from nerf_helpers import (get_ray_bundle, img2mse, meshgrid_xy, mse2psnr,
-                          positional_encoding)
+from nerf_helpers import (
+    get_ray_bundle,
+    img2mse,
+    meshgrid_xy,
+    mse2psnr,
+    positional_encoding,
+)
 from train_utils import eval_nerf, run_one_iter_of_nerf
 
 
@@ -36,6 +41,7 @@ def farthest_sequence_sampling(posedists):
     r"""https://gist.github.com/ctralie/128cc07da67f1d2e10ea470ee2d23fe8
     """
     seqlen = posedists.shape[0]
+    ds = posedists[0]
     farthest_sequence = torch.zeros(seqlen).long()
     sampling_lambdas = torch.zeros(seqlen)
     for i in range(seqlen):
@@ -57,6 +63,11 @@ def main():
         type=str,
         default="",
         help="Path to load saved checkpoint from.",
+    )
+    parser.add_argument(
+        "--passive",
+        action="store_true",
+        help="Emulate a passive training strategy (i.e., don't use active steps).",
     )
     configargs = parser.parse_args()
 
@@ -93,14 +104,17 @@ def main():
         hwf = [H, W, focal]
 
     # Tensor to hold indices of negative examples. Initially, every ray is a negative example.
+    print("Initializing negative example stores.")
     negative_examples = torch.ones(
         len(i_train), images[0].shape[0], images[0].shape[1]
     ).bool()
     negative_examples = negative_examples.reshape(len(i_train), -1)
+    print("Computing pairwise distances among poses.")
     posedists = compute_distmat_se3(poses, len(i_train))
+    print("Farthest sequence sampling among poses.")
     farthest_sequence = farthest_sequence_sampling(posedists)
     next_img_idx = farthest_sequence[0]
-    reset_every = 100
+    reset_every = 500
 
     # Seed experiment for repeatability
     seed = cfg.experiment.randomseed
@@ -239,10 +253,17 @@ def main():
             # select_inds = np.random.choice(
             #     coords.shape[0], size=(cfg.nerf.train.num_random_rays), replace=False
             # )
-            active_negative_inds = torch.where(negative_examples[img_idx])
-            active_negative_inds = active_negative_inds[0]
-            randperm = torch.randperm(active_negative_inds.shape[0])
-            num_select = min(num_random_rays, active_negative_inds.shape[0])
+            randperm, num_select = None, None
+            if configargs.passive is True:
+                randperm = torch.randperm(coords.shape[0])
+                num_select = min(cfg.nerf.train.num_random_rays, coords.shape[0])
+            else:
+                active_negative_inds = torch.where(negative_examples[img_idx])
+                active_negative_inds = active_negative_inds[0]
+                randperm = torch.randperm(active_negative_inds.shape[0])
+                num_select = min(
+                    cfg.nerf.train.num_random_rays, active_negative_inds.shape[0]
+                )
             select_inds_ = randperm[:num_select]
             select_inds = coords[select_inds_]
             ray_origins = ray_origins[select_inds[:, 0], select_inds[:, 1], :]
@@ -292,6 +313,12 @@ def main():
         if rgb_fine is not None:
             writer.add_scalar("train/fine_loss", fine_loss.item(), i)
         writer.add_scalar("train/psnr", psnr, i)
+
+        # Per-ray errors
+        errs = (rgb_coarse[..., :3] - target_ray_values[..., :3]).norm(p=2, dim=-1)
+        # Update active set
+        tol = 1e-3
+        negative_examples[img_idx, select_inds_[errs < tol]] = False
 
         next_img_idx = farthest_sequence[i % len(farthest_sequence)]
         if i % reset_every == 0:
