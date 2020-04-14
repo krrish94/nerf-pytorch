@@ -13,6 +13,7 @@ from tqdm import tqdm, trange
 import models
 from cfgnode import CfgNode
 from load_blender import load_blender_data
+from load_llff import load_llff_data
 from nerf_helpers import (get_ray_bundle, img2mse, meshgrid_xy, mse2psnr,
                           positional_encoding)
 from train_utils import eval_nerf, run_one_iter_of_nerf
@@ -54,15 +55,34 @@ def main():
         USE_CACHED_DATASET = True
     else:
         # Load dataset
-        images, poses, render_poses, hwf, i_split = load_blender_data(
-            cfg.dataset.basedir,
-            half_res=cfg.dataset.half_res,
-            testskip=cfg.dataset.testskip,
-        )
-        i_train, i_val, i_test = i_split
-        H, W, focal = hwf
-        H, W = int(H), int(W)
-        hwf = [H, W, focal]
+        images, poses, render_poses, hwf = None, None, None, None
+        if cfg.dataset.type.lower() == "blender":
+            images, poses, render_poses, hwf, i_split = load_blender_data(
+                cfg.dataset.basedir,
+                half_res=cfg.dataset.half_res,
+                testskip=cfg.dataset.testskip,
+            )
+            i_train, i_val, i_test = i_split
+            H, W, focal = hwf
+            H, W = int(H), int(W)
+            hwf = [H, W, focal]
+        elif cfg.dataset.type.lower() == "llff":
+            images, poses, bds, render_poses, i_test = load_llff_data(
+                cfg.dataset.basedir, factor=cfg.dataset.downsample_factor
+            )
+            hwf = poses[0, :3, -1]
+            poses = poses[:, :3, :4]
+            if not isinstance(i_test, list):
+                i_test = [i_test]
+            if cfg.dataset.llffhold > 0:
+                i_test = np.arange(images.shape[0])[::cfg.dataset.llffhold]
+            i_val = i_test
+            i_train = np.array([i for i in np.arange(images.shape[0]) if (i not in i_test and i not in i_val)])
+            H, W, focal = hwf
+            H, W = int(H), int(W)
+            hwf = [H, W, focal]
+            images = torch.from_numpy(images)
+            poses = torch.from_numpy(poses)
 
     # Seed experiment for repeatability
     seed = cfg.experiment.randomseed
