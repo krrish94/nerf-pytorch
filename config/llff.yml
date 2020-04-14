@@ -1,7 +1,7 @@
 # Parameters to setup experiment.
 experiment:
   # Unique experiment identifier
-  id: lego200
+  id: llff
   # Experiment logs will be stored at "logdir"/"id"
   logdir: logs
   # Seed for random number generators (for repeatability).
@@ -17,25 +17,24 @@ experiment:
 
 # Dataset parameters.
 dataset:
-  # Type of dataset (Blender vs LLFF vs DeepVoxels vs something else)
-  type: blender
+  # Type of the dataset (Blender vs LLFF vs DeepVoxels vs something else)
+  type: llff
   # Base directory of dataset.
-  basedir: cache/nerf_synthetic/lego
+  basedir: cache/nerf_llff_data/fern
   # Optionally, provide a path to the pre-cached dataset dir. This
   # overrides the other dataset options.
-  cachedir: cache/legocache200
-  # For the Blender datasets (synthetic), optionally return images
-  # at half the original resolution of 800 x 800, to save space.
-  half_res: True
-  # Stride (include one per "testskip" images in the dataset).
-  testskip: 10
+  # cachedir: cache/legocache200
   # Do not use NDC (normalized device coordinates). Usually True for
   # synthetic (Blender) datasets.
-  no_ndc: True
+  no_ndc: False
   # Near clip plane (clip all depth values closer than this threshold).
-  near: 2
+  near: 0
   # Far clip plane (clip all depth values farther than this threshold).
-  far: 6
+  far: 1
+  # Downsample factor (used to downsample input images)
+  downsample_factor: 8
+  # TODO: Add description
+  llffhold: 8
 
 # Model parameters.
 models:
@@ -123,7 +122,7 @@ nerf:
     white_background: False
     # Standard deviation of noise to be added to the radiance field when
     # performing volume rendering.
-    radiance_field_noise_std: 0.2
+    radiance_field_noise_std: 1.
     # Sample linearly in disparity space, as opposed to in depth space.
     lindisp: False
   # Validation-specific parameters.
