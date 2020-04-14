@@ -15,7 +15,7 @@
   \*denotes equal contribution
 
 <p align="center">
-    <img src='imgs/pipeline.jpg'/>
+    <img src="assets/pipeline.jpg"/>
 </p>
 
 A PyTorch re-implementation of [Neural Radiance Fields](http://tancik.com/nerf).
