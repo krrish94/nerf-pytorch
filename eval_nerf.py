@@ -7,14 +7,13 @@ import numpy as np
 import torch
 import torchvision
 import yaml
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 import models
 from cfgnode import CfgNode
 from load_blender import load_blender_data
 from load_llff import load_llff_data
-from nerf_helpers import (get_ray_bundle, img2mse, meshgrid_xy, mse2psnr,
-                          positional_encoding)
+from nerf_helpers import get_ray_bundle, positional_encoding
 from train_utils import eval_nerf
 
 
@@ -38,12 +37,10 @@ def main():
         "--checkpoint",
         type=str,
         required=True,
-        help="Checkpoint / pre-trained model to evaluate."
+        help="Checkpoint / pre-trained model to evaluate.",
     )
     parser.add_argument(
-        "--savedir",
-        type=str,
-        help="Save images to this directory, if specified."
+        "--savedir", type=str, help="Save images to this directory, if specified."
     )
     configargs = parser.parse_args()
 
@@ -68,8 +65,7 @@ def main():
     elif cfg.dataset.type.lower() == "llff":
         # Load LLFF dataset
         images, poses, bds, render_poses, i_test = load_llff_data(
-            cfg.dataset.basedir,
-            factor=cfg.dataset.downsample_factor,
+            cfg.dataset.basedir, factor=cfg.dataset.downsample_factor,
         )
         hwf = poses[0, :3, -1]
         H, W, focal = hwf
@@ -123,13 +119,15 @@ def main():
         try:
             model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
         except:
-            print("The checkpoint has a fine-level model, but it could "
-                  "not be loaded (possibly due to a mismatched config file.")
+            print(
+                "The checkpoint has a fine-level model, but it could "
+                "not be loaded (possibly due to a mismatched config file."
+            )
 
     model_coarse.eval()
     if model_fine:
         model_fine.eval()
-    
+
     render_poses = render_poses.float().to(device)
 
     # Create directory to save images to.
@@ -141,9 +139,7 @@ def main():
         start = time.time()
         rgb_coarse = None
         with torch.no_grad():
-            ray_origins, ray_directions = get_ray_bundle(
-                hwf[0], hwf[1], hwf[2], pose
-            )
+            ray_origins, ray_directions = get_ray_bundle(hwf[0], hwf[1], hwf[2], pose)
             rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
                 hwf[0],
                 hwf[1],
@@ -166,4 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -14,8 +14,13 @@ import models
 from cfgnode import CfgNode
 from load_blender import load_blender_data
 from load_llff import load_llff_data
-from nerf_helpers import (get_ray_bundle, img2mse, meshgrid_xy, mse2psnr,
-                          positional_encoding)
+from nerf_helpers import (
+    get_ray_bundle,
+    img2mse,
+    meshgrid_xy,
+    mse2psnr,
+    positional_encoding,
+)
 from train_utils import eval_nerf, run_one_iter_of_nerf
 
 
@@ -75,9 +80,15 @@ def main():
             if not isinstance(i_test, list):
                 i_test = [i_test]
             if cfg.dataset.llffhold > 0:
-                i_test = np.arange(images.shape[0])[::cfg.dataset.llffhold]
+                i_test = np.arange(images.shape[0])[:: cfg.dataset.llffhold]
             i_val = i_test
-            i_train = np.array([i for i in np.arange(images.shape[0]) if (i not in i_test and i not in i_val)])
+            i_train = np.array(
+                [
+                    i
+                    for i in np.arange(images.shape[0])
+                    if (i not in i_test and i not in i_val)
+                ]
+            )
             H, W, focal = hwf
             H, W = int(H), int(W)
             hwf = [H, W, focal]
