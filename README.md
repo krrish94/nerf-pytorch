@@ -6,6 +6,8 @@
 
 A PyTorch re-implementation of [Neural Radiance Fields](http://tancik.com/nerf).
 
+The current implementation is blazingly fast! (Thorough benchmark to come, but **~2x faster**)
+
 
 ## Tiny-NeRF on Google Colab
 
@@ -23,16 +25,16 @@ pip install requirements.txt
 
 **Importantly**, install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted) by following instructions from their `README`.
 
-Once everything is setup, to run experiments, first edit `config/default.yml` to specify your own parameters.
+Once everything is setup, to run experiments, first edit `config/lego.yml` to specify your own parameters.
 
 The training script can be invoked by running
 ```
-python train_nerf.py --config config/default.yml
+python train_nerf.py --config config/lego.yml
 ```
 
 Optionally, if resuming training from a previous checkpoint, run
 ```
-python train_nerf.py --config config/default.yml --load-checkpoint path/to/checkpoint.ckpt
+python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt
 ```
 
 
@@ -45,13 +47,9 @@ A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can b
 
 All said, this is not an official code release, and is instead a reproduction from the original code (released by the authors [here](https://github.com/bmild/nerf)).
 
-I have currently ensured (to the best of my abilities, but feel free to open issues if you feel something's wrong :) ) that
+The code is thoroughly tested (to the best of my abilities) to match the original implementation (and be much faster)! In particular, I have ensured that
 * Every _individual_ module exactly (numerically) matches that of the TensorFlow implementation. [This Colab notebook](https://colab.research.google.com/drive/1ENrAtZIEhoeNkaXOXkBL7SbWU1VWHBQm) has all the tests, matching op for op (but is very scratchy to look at)!
-* Training works as expected for fairly small resolutions (100 x 100).
-
-However, this implementation still **lacks** the following:
-* I have not run all the full experiments devised in the paper.
-* I've only tested on the `lego` sequence of the synthetic (Blender) datasets.
+* Training works as expected (for Lego and LLFF scenes).
 
 The organization of code **WILL** change around a lot, because I'm actively experimenting with this.
 
@@ -66,3 +64,7 @@ Feel free to raise GitHub issues if you find anything concerning. Pull requests 
 ## LICENSE
 
 `nerf-pytorch` is available under the [MIT License](https://opensource.org/licenses/MIT). For more details see: [LICENSE](LICENSE) and [ACKNOWLEDGEMENTS](ACKNOWLEDGEMENTS).
+
+## Misc
+
+Also, a shoutout to [yenchenlin](https://github.com/yenchenlin) for his cool PyTorch [implementation](https://github.com/yenchenlin/nerf-pytorch), whose volume rendering function replaced mine (my initial impl was inefficient in comparison).
