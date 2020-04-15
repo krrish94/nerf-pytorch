@@ -20,7 +20,12 @@
 
 A PyTorch re-implementation of [Neural Radiance Fields](http://tancik.com/nerf).
 
-The current implementation is blazingly fast! (Thorough benchmark to come, but **~2x faster**)
+## Speed matters!
+
+The current implementation is **_blazing fast!_** (**~9x faster** than the [original release](https://github.com/bmild/nerf), **~4x faster** than this [concurrent pytorch implementation](https://github.com/yenchenlin/nerf-pytorch))
+
+> _What's the secret sauce behind this speedup?_
+> Multiple aspects. Besides obvious enhancements such as data caching, effective memory management, etc. I drilled down through the entire NeRF codebase, and reduced data transfer b/w CPU and GPU, vectorized code where possible, and used efficient variants of pytorch ops (wrote some where unavailable). But for these changes, everything else is a faithful reproduction of the NeRF technique we all admire :)
 
 
 ## Tiny-NeRF on Google Colab
@@ -37,7 +42,7 @@ A neural radiance field is a simple fully connected network (weights are ~5MB) t
 Optimizing a NeRF takes between a few hours and a day or two (depending on resolution) and only requires a single GPU. Rendering an image from an optimized NeRF takes somewhere between less than a second and ~30 seconds, again depending on resolution.
 
 
-## How to train your NeRF
+## How to train your NeRF super-quickly!
 
 To train a "full" NeRF model (i.e., using 3D coordinates as well as ray directions, and the hierarchical sampling procedure), first setup dependencies. In a new `conda` or `virtualenv` environment, run
 ```bash
@@ -57,6 +62,17 @@ Optionally, if resuming training from a previous checkpoint, run
 ```bash
 python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt
 ```
+
+### Cache rays from the dataset (Optional)
+
+An optional, yet simple preprocessing step of caching rays from the dataset results in substantial compute time savings (reduced carbon footprint, yay!), especially when running multiple experiments. It's super-simple: run
+```bash
+python cache_dataset.py --datapath cache/nerf_synthetic/lego/ --halfres False --savedir cache/legocache/legofull --num-random-rays 8192 --num-variations 500
+```
+
+This samples `8192` rays per image from the `lego` dataset. Each image is `800 x 800` (since `halfres` is set to `False`), and `500` such random samples (`8192` rays each) are drawn per image. The script takes about 10 minutes to run, but the good thing is, this needs to be run only once per dataset.
+
+> **NOTE**: Do NOT forget to update the `cachedir` option (under `dataset`) in your config (.yml) file!
 
 
 ## (Full) NeRF on Google Colab
@@ -87,7 +103,7 @@ The code is thoroughly tested (to the best of my abilities) to match the origina
 
 The organization of code **WILL** change around a lot, because I'm actively experimenting with this.
 
-**Pretrained models**: I am running a few large-scale experiments, and I hope to release models sometime in the end of April.
+**Pretrained models**: I am running a few large-scale experiments, and I hope to release models sometime in the next few days.
 
 
 ## Contributing / Issues?
