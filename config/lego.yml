@@ -1,15 +1,15 @@
 # Parameters to setup experiment.
 experiment:
   # Unique experiment identifier
-  id: lego200
+  id: lego
   # Experiment logs will be stored at "logdir"/"id"
   logdir: logs
   # Seed for random number generators (for repeatability).
-  randomseed: 34  # 8239
+  randomseed: 42  # Cause, why not?
   # Number of training iterations.
   train_iters: 250000
   # Number of training iterations after which to validate.
-  validate_every: 50
+  validate_every: 100
   # Number of training iterations after which to checkpoint.
   save_every: 5000
   # Number of training iterations after which to print progress.
@@ -23,7 +23,7 @@ dataset:
   basedir: cache/nerf_synthetic/lego
   # Optionally, provide a path to the pre-cached dataset dir. This
   # overrides the other dataset options.
-  cachedir: cache/legocache200
+  cachedir: cache/legocache/legofull
   # For the Blender datasets (synthetic), optionally return images
   # at half the original resolution of 800 x 800, to save space.
   half_res: True
@@ -72,7 +72,7 @@ models:
     num_layers: 4
     # Number of hidden units in each layer of the MLP (multi-layer
     # perceptron).
-    hidden_size: 64
+    hidden_size: 128
     # Add a skip connection once in a while. Note: This parameter
     # won't take affect unless num_layers > skip_connect_every.
     skip_connect_every: 3
@@ -96,6 +96,13 @@ optimizer:
   type: Adam
   # Learning rate.
   lr: 5.0E-3
+ 
+# Learning rate schedule.
+scheduler:
+  # Exponentially decay learning rate (in 1000 steps)
+  lr_decay: 250
+  # Rate at which to apply this decay.
+  lr_decay_factor: 0.1
 
 # NeRF parameters.
 nerf:
@@ -109,7 +116,7 @@ nerf:
   train:
     # Number of random rays to retain from each image.
     # These sampled rays are used for training, and the others are discarded.
-    num_random_rays: 4096  # 32 * 32 * 4
+    num_random_rays: 8192  # 32 * 32 * 4
     # Size of each chunk (rays are batched into "chunks" and passed through
     # the network)
     chunksize: 131072  # 131072  # 1024 * 32
