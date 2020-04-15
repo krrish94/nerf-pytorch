@@ -87,8 +87,12 @@ def get_ray_bundle(
     """
     # TESTED
     ii, jj = meshgrid_xy(
-        torch.arange(width).to(tform_cam2world),
-        torch.arange(height).to(tform_cam2world),
+        torch.arange(
+            width, dtype=tform_cam2world.dtype, device=tform_cam2world.device
+        ).to(tform_cam2world),
+        torch.arange(
+            height, dtype=tform_cam2world.dtype, device=tform_cam2world.device
+        ),
     )
     directions = torch.stack(
         [
@@ -227,16 +231,24 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
     """
 
     weights = weights + 1e-5
-    pdf = weights / torch.sum(weights, -1, keepdim=True)
-    cdf = torch.cumsum(pdf, -1)
-    cdf = torch.cat([torch.zeros_like(cdf[..., :1]), cdf], -1)  # (batchsize, len(bins))
+    pdf = weights / torch.sum(weights, dim=-1, keepdim=True)
+    cdf = torch.cumsum(pdf, dim=-1)
+    cdf = torch.cat(
+        [torch.zeros_like(cdf[..., :1]), cdf], dim=-1
+    )  # (batchsize, len(bins))
 
     # Take uniform samples
     if det:
-        u = torch.linspace(0.0, 1.0, steps=num_samples)
+        u = torch.linspace(
+            0.0, 1.0, steps=num_samples, dtype=weights.dtype, device=weights.device
+        )
         u = u.expand(list(cdf.shape[:-1]) + [num_samples])
     else:
-        u = torch.rand(list(cdf.shape[:-1]) + [num_samples]).to(weights)
+        u = torch.rand(
+            list(cdf.shape[:-1]) + [num_samples],
+            dtype=weights.dtype,
+            device=weights.device,
+        )
 
     # Invert CDF
     u = u.contiguous()
@@ -244,9 +256,9 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
     inds = torchsearchsorted.searchsorted(cdf, u, side="right")
     below = torch.max(torch.zeros_like(inds - 1), inds - 1)
     above = torch.min((cdf.shape[-1] - 1) * torch.ones_like(inds), inds)
-    inds_g = torch.stack([below, above], dim=-1)  # (batchsize, num_samples, 2)
+    inds_g = torch.stack((below, above), dim=-1)  # (batchsize, num_samples, 2)
 
-    matched_shape = [inds_g.shape[0], inds_g.shape[1], cdf.shape[-1]]
+    matched_shape = (inds_g.shape[0], inds_g.shape[1], cdf.shape[-1])
     cdf_g = torch.gather(cdf.unsqueeze(1).expand(matched_shape), 2, inds_g)
     bins_g = torch.gather(bins.unsqueeze(1).expand(matched_shape), 2, inds_g)
 

@@ -1,7 +1,6 @@
 import argparse
 import glob
 import os
-import time
 
 import numpy as np
 import torch
@@ -21,7 +20,7 @@ from nerf_helpers import (
     mse2psnr,
     positional_encoding,
 )
-from train_utils import eval_nerf, run_one_iter_of_nerf
+from train_utils import run_one_iter_of_nerf
 
 
 def main():
@@ -37,6 +36,8 @@ def main():
         help="Path to load saved checkpoint from.",
     )
     configargs = parser.parse_args()
+
+    then = time.time()
 
     # Read config file.
     cfg = None
@@ -176,6 +177,8 @@ def main():
             model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
         # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
+    print(f"Init time: {time.time() - then}")
+
     # # TODO: Prepare raybatch tensor if batching random rays
 
     for i in trange(cfg.experiment.train_iters):
@@ -189,7 +192,7 @@ def main():
         if USE_CACHED_DATASET:
             datafile = np.random.choice(train_paths)
             cache_dict = torch.load(datafile)
-            ray_bundle = cache_dict["ray_bundle"]
+            ray_bundle = cache_dict["ray_bundle"].to(device)
             ray_origins, ray_directions = (
                 ray_bundle[0].reshape((-1, 3)),
                 ray_bundle[1].reshape((-1, 3)),
@@ -205,14 +208,16 @@ def main():
                 ray_directions[select_inds],
             )
             target_ray_values = target_ray_values[select_inds].to(device)
-            ray_bundle = torch.stack([ray_origins, ray_directions], dim=0).to(device)
+            # ray_bundle = torch.stack([ray_origins, ray_directions], dim=0).to(device)
+
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 cache_dict["height"],
                 cache_dict["width"],
                 cache_dict["focal_length"],
                 model_coarse,
                 model_fine,
-                ray_bundle,
+                ray_origins,
+                ray_directions,
                 cfg,
                 mode="train",
                 encode_position_fn=encode_position_fn,
@@ -234,16 +239,18 @@ def main():
             select_inds = coords[select_inds]
             ray_origins = ray_origins[select_inds[:, 0], select_inds[:, 1], :]
             ray_directions = ray_directions[select_inds[:, 0], select_inds[:, 1], :]
-            batch_rays = torch.stack([ray_origins, ray_directions], dim=0)
+            # batch_rays = torch.stack([ray_origins, ray_directions], dim=0)
             target_s = img_target[select_inds[:, 0], select_inds[:, 1], :]
 
+            then = time.time()
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 H,
                 W,
                 focal,
                 model_coarse,
                 model_fine,
-                batch_rays,
+                ray_origins,
+                ray_directions,
                 cfg,
                 mode="train",
                 encode_position_fn=encode_position_fn,
@@ -297,7 +304,7 @@ def main():
                 if USE_CACHED_DATASET:
                     datafile = np.random.choice(validation_paths)
                     cache_dict = torch.load(datafile)
-                    rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
+                    rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                         cache_dict["height"],
                         cache_dict["width"],
                         cache_dict["focal_length"],
@@ -318,7 +325,7 @@ def main():
                     ray_origins, ray_directions = get_ray_bundle(
                         H, W, focal, pose_target
                     )
-                    rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
+                    rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                         H,
                         W,
                         focal,
@@ -342,15 +349,17 @@ def main():
                 writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
                 writer.add_scalar("validataion/psnr", psnr, i)
                 writer.add_image(
-                    "validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3])
+                    "validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]), i
                 )
                 if rgb_fine is not None:
                     writer.add_image(
-                        "validation/rgb_fine", cast_to_image(rgb_fine[..., :3])
+                        "validation/rgb_fine", cast_to_image(rgb_fine[..., :3]), i
                     )
                     writer.add_scalar("validation/fine_loss", fine_loss.item(), i)
                 writer.add_image(
-                    "validation/img_target", cast_to_image(target_ray_values[..., :3])
+                    "validation/img_target",
+                    cast_to_image(target_ray_values[..., :3]),
+                    i,
                 )
                 tqdm.write(
                     "Validation loss: "

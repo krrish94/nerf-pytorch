@@ -26,8 +26,15 @@ def volume_render_radiance_field(
     rgb = torch.sigmoid(radiance_field[..., :3])
     noise = 0.0
     if radiance_field_noise_std > 0.0:
-        noise = torch.randn(radiance_field[..., 3].shape) * radiance_field_noise_std
-        noise = noise.to(radiance_field)
+        noise = (
+            torch.randn(
+                radiance_field[..., 3].shape,
+                dtype=radiance_field.dtype,
+                device=radiance_field.device,
+            )
+            * radiance_field_noise_std
+        )
+        # noise = noise.to(radiance_field)
     sigma_a = torch.nn.functional.relu(radiance_field[..., 3] + noise)
     alpha = 1.0 - torch.exp(-sigma_a * dists)
     weights = alpha * cumprod_exclusive(1.0 - alpha + 1e-10)
