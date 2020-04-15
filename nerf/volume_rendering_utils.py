@@ -1,6 +1,6 @@
 import torch
 
-from nerf_helpers import cumprod_exclusive
+from .nerf_helpers import cumprod_exclusive
 
 
 def volume_render_radiance_field(

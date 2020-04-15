@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from tqdm import tqdm, trange
 
-from nerf_helpers import (
+from nerf import (
     cumprod_exclusive,
     get_minibatches,
     get_ray_bundle,

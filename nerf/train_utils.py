@@ -1,8 +1,8 @@
 import torch
 
-from nerf_helpers import get_minibatches, ndc_rays
-from nerf_helpers import sample_pdf_2 as sample_pdf
-from volume_rendering_utils import volume_render_radiance_field
+from .nerf_helpers import get_minibatches, ndc_rays
+from .nerf_helpers import sample_pdf_2 as sample_pdf
+from .volume_rendering_utils import volume_render_radiance_field
 
 
 def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn):

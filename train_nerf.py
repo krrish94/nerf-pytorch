@@ -10,18 +10,18 @@ import yaml
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
-import models
-from cfgnode import CfgNode
-from load_blender import load_blender_data
-from load_llff import load_llff_data
-from nerf_helpers import (
+from nerf import models
+from nerf import CfgNode
+from nerf import load_blender_data
+from nerf import load_llff_data
+from nerf import (
     get_ray_bundle,
     img2mse,
     meshgrid_xy,
     mse2psnr,
     positional_encoding,
 )
-from train_utils import run_one_iter_of_nerf
+from nerf import run_one_iter_of_nerf
 
 
 def main():
