@@ -168,17 +168,21 @@ def main():
     with open(os.path.join(logdir, "config.yml"), "w") as f:
         f.write(cfg.dump())  # cfg, f, default_flow_style=False)
 
+    # By default, start at iteration 0 (unless a checkpoint is specified).
+    start_iter = 0
+
     # Load an existing checkpoint, if a path is specified.
     if os.path.exists(configargs.load_checkpoint):
         checkpoint = torch.load(configargs.load_checkpoint)
         model_coarse.load_state_dict(checkpoint["model_coarse_state_dict"])
         if checkpoint["model_fine_state_dict"]:
             model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
-        # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_iter = checkpoint["iter"]
 
     # # TODO: Prepare raybatch tensor if batching random rays
 
-    for i in trange(cfg.experiment.train_iters):
+    for i in trange(start_iter, cfg.experiment.train_iters):
 
         model_coarse.train()
         if model_fine:
