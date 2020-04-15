@@ -16,10 +16,9 @@ def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn):
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = torch.cat((embedded, embedded_dirs), dim=-1)
 
+    then = time.time()
     batches = get_minibatches(embedded, chunksize=chunksize)
-    preds = []
-    for batch in batches:
-        preds.append(network_fn(batch))
+    preds = [network_fn(batch) for batch in batches]
     radiance_field = torch.cat(preds, dim=0)
     radiance_field = radiance_field.reshape(
         list(pts.shape[:-1]) + [radiance_field.shape[-1]]
@@ -41,7 +40,6 @@ def predict_and_render_radiance(
     encode_direction_fn=None,
 ):
     # TESTED
-
     if encode_position_fn is None:
         encode_position_fn = identity_encoding
     if encode_direction_fn is None:
@@ -49,12 +47,18 @@ def predict_and_render_radiance(
 
     num_rays = ray_batch.shape[0]
     ro, rd = ray_batch[..., :3], ray_batch[..., 3:6]
-    bounds = ray_batch[..., 6:8].reshape((-1, 1, 2))
+    bounds = ray_batch[..., 6:8].view((-1, 1, 2))
     near, far = bounds[..., 0], bounds[..., 1]
 
     # TODO: Use actual values for "near" and "far" (instead of 0. and 1.)
     # when not enabling "ndc".
-    t_vals = torch.linspace(0.0, 1.0, getattr(options.nerf, mode).num_coarse).to(ro)
+    t_vals = torch.linspace(
+        0.0,
+        1.0,
+        getattr(options.nerf, mode).num_coarse,
+        dtype=ro.dtype,
+        device=ro.device,
+    )
     if not getattr(options.nerf, mode).lindisp:
         z_vals = near * (1.0 - t_vals) + far * t_vals
     else:
@@ -67,18 +71,10 @@ def predict_and_render_radiance(
         upper = torch.cat((mids, z_vals[..., -1:]), dim=-1)
         lower = torch.cat((z_vals[..., :1], mids), dim=-1)
         # Stratified samples in those intervals.
-        t_rand = torch.rand(z_vals.shape).to(ro)
+        t_rand = torch.rand(z_vals.shape, dtype=ro.dtype, device=ro.device)
         z_vals = lower + (upper - lower) * t_rand
     # pts -> (num_rays, N_samples, 3)
     pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
-
-    # num_coarse = getattr(options.nerf, mode).num_coarse
-    # far_ = options.dataset.far
-    # near_ = options.dataset.near
-    # z_vals = torch.linspace(near_, far_, num_coarse).to(ro)
-    # noise_shape = list(ro.shape[:-1]) + [num_coarse]
-    # z_vals = z_vals + torch.rand(noise_shape).to(ro) * (far_ - near_) / num_coarse
-    # pts = ro[..., None, :] + rd[..., None, :] * z_vals[..., :, None]
 
     radiance_field = run_network(
         model_coarse,
@@ -143,12 +139,13 @@ def predict_and_render_radiance(
 
 
 def run_one_iter_of_nerf(
-    H,
-    W,
-    focal,
+    height,
+    width,
+    focal_length,
     model_coarse,
     model_fine,
-    batch_rays,
+    ray_origins,
+    ray_directions,
     options,
     mode="train",
     encode_position_fn=None,
@@ -159,24 +156,29 @@ def run_one_iter_of_nerf(
     if encode_direction_fn is None:
         encode_direction_fn = identity_encoding
 
-    ray_origins = batch_rays[0]
-    ray_directions = batch_rays[1]
+    # ray_origins = batch_rays[0]
+    # ray_directions = batch_rays[1]
     viewdirs = None
     if options.nerf.use_viewdirs:
         # Provide ray directions as input
         viewdirs = ray_directions
         viewdirs = viewdirs / viewdirs.norm(p=2, dim=-1).unsqueeze(-1)
-        viewdirs = viewdirs.reshape((-1, 3))
-    ray_shapes = ray_directions.shape  # Cache now, to restore later.
+        viewdirs = viewdirs.view((-1, 3))
+    # Cache shapes now, for later restoration.
+    restore_shapes = [
+        ray_directions.shape,
+        ray_directions.shape[:-1],
+        ray_directions.shape[:-1],
+    ]
+    if model_fine:
+        restore_shapes += restore_shapes
     if options.dataset.no_ndc is False:
-        ro, rd = ndc_rays(H, W, focal, 1.0, ray_origins, ray_directions)
-        ro = ro.reshape((-1, 3))
-        rd = rd.reshape((-1, 3))
+        ro, rd = ndc_rays(height, width, focal_length, 1.0, ray_origins, ray_directions)
+        ro = ro.view((-1, 3))
+        rd = rd.view((-1, 3))
     else:
-        ro = ray_origins.reshape((-1, 3))
-        rd = ray_directions.reshape((-1, 3))
-    # near = options.nerf.near * torch.ones_like(rd[..., :1])
-    # far = options.nerf.far * torch.ones_like(rd[..., :1])
+        ro = ray_origins.view((-1, 3))
+        rd = ray_directions.view((-1, 3))
     near = options.dataset.near * torch.ones_like(rd[..., :1])
     far = options.dataset.far * torch.ones_like(rd[..., :1])
     rays = torch.cat((ro, rd, near, far), dim=-1)
@@ -184,12 +186,8 @@ def run_one_iter_of_nerf(
         rays = torch.cat((rays, viewdirs), dim=-1)
 
     batches = get_minibatches(rays, chunksize=getattr(options.nerf, mode).chunksize)
-    # TODO: Init a list, keep appending outputs to that list,
-    # concat everything in the end.
-    rgb_coarse, disp_coarse, acc_coarse = [], [], []
-    rgb_fine, disp_fine, acc_fine = None, None, None
-    for batch in batches:
-        rc, dc, ac, rf, df, af = predict_and_render_radiance(
+    pred = [
+        predict_and_render_radiance(
             batch,
             model_coarse,
             model_fine,
@@ -197,82 +195,14 @@ def run_one_iter_of_nerf(
             encode_position_fn=encode_position_fn,
             encode_direction_fn=encode_direction_fn,
         )
-        rgb_coarse.append(rc)
-        disp_coarse.append(dc)
-        acc_coarse.append(ac)
-        if rf is not None:
-            if rgb_fine is None:
-                rgb_fine = [rf]
-            else:
-                rgb_fine.append(rf)
-        if df is not None:
-            if disp_fine is None:
-                disp_fine = [df]
-            else:
-                disp_fine.append(df)
-        if af is not None:
-            if acc_fine is None:
-                acc_fine = [af]
-            else:
-                acc_fine.append(af)
-
-    rgb_coarse_ = torch.cat(rgb_coarse, dim=0)
-    disp_coarse_ = torch.cat(disp_coarse, dim=0)
-    acc_coarse_ = torch.cat(acc_coarse, dim=0)
-    if rgb_fine is not None:
-        rgb_fine_ = torch.cat(rgb_fine, dim=0)
-    else:
-        rgb_fine_ = None
-    if disp_fine is not None:
-        disp_fine_ = torch.cat(disp_fine, dim=0)
-    else:
-        disp_fine_ = None
-    if acc_fine is not None:
-        acc_fine_ = torch.cat(acc_fine, dim=0)
-    else:
-        acc_fine_ = None
-
-    return rgb_coarse_, disp_coarse_, acc_coarse_, rgb_fine_, disp_fine_, acc_fine_
-
-
-def eval_nerf(
-    height,
-    width,
-    focal_length,
-    model_coarse,
-    model_fine,
-    ray_origins,
-    ray_directions,
-    options,
-    mode="validation",
-    encode_position_fn=None,
-    encode_direction_fn=None,
-):
-    r"""Evaluate a NeRF by synthesizing a full image (as opposed to train mode, where
-    only a handful of rays/pixels are synthesized).
-    """
-    if encode_position_fn is None:
-        encode_position_fn = identity_encoding
-    if encode_direction_fn is None:
-        encode_direction_fn = identity_encoding
-    original_shape = ray_origins.shape
-    ray_origins = ray_origins.reshape((1, -1, 3))
-    ray_directions = ray_directions.reshape((1, -1, 3))
-    batch_rays = torch.cat((ray_origins, ray_directions), dim=0)
-    rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
-        height,
-        width,
-        focal_length,
-        model_coarse,
-        model_fine,
-        batch_rays,
-        options,
-        mode="validation",
-        encode_position_fn=encode_position_fn,
-        encode_direction_fn=encode_direction_fn,
-    )
-    rgb_coarse = rgb_coarse.reshape(original_shape)
-    if rgb_fine is not None:
-        rgb_fine = rgb_fine.reshape(original_shape)
-
-    return rgb_coarse, None, None, rgb_fine, None, None
+        for batch in batches
+    ]
+    synthesized_images = list(zip(*pred))
+    synthesized_images = [torch.cat(image, dim=0) for image in synthesized_images]
+    if mode == "validation":
+        synthesized_images = [
+            image.view(shape)
+            for (image, shape) in zip(synthesized_images, restore_shapes)
+        ]
+    # Returns rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine.
+    return tuple(synthesized_images)
