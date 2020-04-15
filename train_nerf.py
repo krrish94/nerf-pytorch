@@ -269,6 +269,13 @@ def main():
         psnr = mse2psnr(loss.item())
         optimizer.step()
         optimizer.zero_grad()
+
+        # Learning rate updates
+        num_decay_steps = cfg.scheduler.lr_decay * 1000
+        lr_new = cfg.optimizer.lr * (cfg.scheduler.lr_decay_factor ** (i / num_decay_steps))
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = lr_new
+
         if i % cfg.experiment.print_every == 0 or i == cfg.experiment.train_iters - 1:
             tqdm.write(
                 "[TRAIN] Iter: "
@@ -363,7 +370,7 @@ def main():
                     + str(loss.item())
                     + " Validation PSNR: "
                     + str(psnr)
-                    + "Time: "
+                    + " Time: "
                     + str(time.time() - start)
                 )
 
