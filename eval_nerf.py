@@ -14,7 +14,7 @@ from cfgnode import CfgNode
 from load_blender import load_blender_data
 from load_llff import load_llff_data
 from nerf_helpers import get_ray_bundle, positional_encoding
-from train_utils import eval_nerf
+from train_utils import run_one_iter_of_nerf
 
 
 def cast_to_image(tensor):
@@ -140,7 +140,7 @@ def main():
         rgb_coarse = None
         with torch.no_grad():
             ray_origins, ray_directions = get_ray_bundle(hwf[0], hwf[1], hwf[2], pose)
-            rgb_coarse, _, _, rgb_fine, _, _ = eval_nerf(
+            rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 hwf[0],
                 hwf[1],
                 hwf[2],
