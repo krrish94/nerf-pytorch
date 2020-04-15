@@ -16,7 +16,6 @@ def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn):
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = torch.cat((embedded, embedded_dirs), dim=-1)
 
-    then = time.time()
     batches = get_minibatches(embedded, chunksize=chunksize)
     preds = [network_fn(batch) for batch in batches]
     radiance_field = torch.cat(preds, dim=0)

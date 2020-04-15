@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+import time
 
 import numpy as np
 import torch
@@ -36,8 +37,6 @@ def main():
         help="Path to load saved checkpoint from.",
     )
     configargs = parser.parse_args()
-
-    then = time.time()
 
     # Read config file.
     cfg = None
@@ -176,8 +175,6 @@ def main():
         if checkpoint["model_fine_state_dict"]:
             model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
         # optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-    print(f"Init time: {time.time() - then}")
 
     # # TODO: Prepare raybatch tensor if batching random rays
 
