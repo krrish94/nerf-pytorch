@@ -1,7 +1,8 @@
+import math
 from typing import Optional
 
-import math
 import torch
+
 import torchsearchsorted
 
 

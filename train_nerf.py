@@ -10,18 +10,9 @@ import yaml
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
-from nerf import models
-from nerf import CfgNode
-from nerf import load_blender_data
-from nerf import load_llff_data
-from nerf import (
-    get_ray_bundle,
-    img2mse,
-    meshgrid_xy,
-    mse2psnr,
-    positional_encoding,
-)
-from nerf import run_one_iter_of_nerf
+from nerf import (CfgNode, get_ray_bundle, img2mse, load_blender_data,
+                  load_llff_data, meshgrid_xy, models, mse2psnr,
+                  positional_encoding, run_one_iter_of_nerf)
 
 
 def main():
@@ -276,7 +267,9 @@ def main():
 
         # Learning rate updates
         num_decay_steps = cfg.scheduler.lr_decay * 1000
-        lr_new = cfg.optimizer.lr * (cfg.scheduler.lr_decay_factor ** (i / num_decay_steps))
+        lr_new = cfg.optimizer.lr * (
+            cfg.scheduler.lr_decay_factor ** (i / num_decay_steps)
+        )
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr_new
 

@@ -6,12 +6,8 @@ import numpy as np
 import torch
 from tqdm import tqdm, trange
 
-from nerf import (
-    cumprod_exclusive,
-    get_minibatches,
-    get_ray_bundle,
-    positional_encoding,
-)
+from nerf import (cumprod_exclusive, get_minibatches, get_ray_bundle,
+                  positional_encoding)
 
 
 def compute_query_points_from_rays(

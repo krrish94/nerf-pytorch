@@ -10,20 +10,50 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from nerf import load_blender_data
-from nerf import load_llff_data
-from nerf import get_ray_bundle, meshgrid_xy
+from nerf import get_ray_bundle, load_blender_data, load_llff_data, meshgrid_xy
 
 
 def cache_nerf_dataset(args):
-    images, poses, render_poses, hwf, i_split = load_blender_data(
-        args.datapath, half_res=args.halfres, testskip=args.stride
-    )
 
-    i_train, i_val, i_test = i_split
-    H, W, focal = hwf
-    H, W = int(H), int(W)
-    hwf = [H, W, focal]
+    images, poses, render_poses, hwf = (
+        None,
+        None,
+        None,
+        None,
+    )
+    i_train, i_val, i_test = None, None, None
+
+    if args.type == "blender":
+        images, poses, render_poses, hwf, i_split = load_blender_data(
+            args.datapath, half_res=args.blender_half_res, testskip=args.blender_stride
+        )
+
+        i_train, i_val, i_test = i_split
+        H, W, focal = hwf
+        H, W = int(H), int(W)
+        hwf = [H, W, focal]
+    elif args.type == "llff":
+        images, poses, bds, render_poses, i_test = load_llff_data(
+            args.datapath, factor=args.llff_downsample_factor
+        )
+        hwf = poses[0, :3, -1]
+        poses = poses[:, :3, :4]
+        if not isinstance(i_test, list):
+            i_test = [i_test]
+        if args.llffhold > 0:
+            i_test = np.arange(images.shape[0])[:: args.llffhold]
+        i_val = i_test
+        i_train = np.array(
+            [
+                i
+                for i in np.arange(images.shape[0])
+                if (i not in i_test and i not in i_val)
+            ]
+        )
+        H, W, focal = hwf
+        hwf = [int(H), int(W), focal]
+        images = torch.from_numpy(images)
+        poses = torch.from_numpy(poses)
 
     # Device on which to run.
     if torch.cuda.is_available():
@@ -114,18 +144,37 @@ if __name__ == "__main__":
         help="Path to root dir of dataset that needs caching.",
     )
     parser.add_argument(
-        "--halfres",
+        "--type",
+        type=str.lower,
+        required=True,
+        choices=["blender", "llff"],
+        help="Type of the dataset to be cached.",
+    )
+    parser.add_argument(
+        "--blender-half-res",
         type=bool,
         default=True,
         help="Whether to load the (Blender/synthetic) datasets"
         "at half the resolution.",
     )
     parser.add_argument(
-        "--stride",
+        "--blender-stride",
         type=int,
         default=1,
-        help="Stride length. When set to k (k > 1), it samples"
+        help="Stride length (Blender datasets only). When set to k (k > 1), it samples"
         "every kth sample from the dataset.",
+    )
+    parser.add_argument(
+        "--llff-downsample-factor",
+        type=int,
+        default=8,
+        help="Downsample factor for images from the LLFF dataset.",
+    )
+    parser.add_argument(
+        "--llffhold",
+        type=int,
+        default=8,
+        help="Determines the hold-out images for LLFF (TODO: make better).",
     )
     parser.add_argument(
         "--savedir", type=str, required=True, help="Path to save the cached dataset to."
