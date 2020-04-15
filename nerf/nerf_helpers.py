@@ -111,7 +111,7 @@ def get_ray_bundle(
 
 
 def positional_encoding(
-    tensor, num_encoding_functions=6, include_input=True
+    tensor, num_encoding_functions=6, include_input=True, log_sampling=True
 ) -> torch.Tensor:
     r"""Apply positional encoding to the input.
 
@@ -128,12 +128,33 @@ def positional_encoding(
     # TESTED
     # Trivially, the input tensor is added to the positional encoding.
     encoding = [tensor] if include_input else []
-    # Now, encode the input using a set of high-frequency functions and append the
-    # resulting values to the encoding.
-    for i in range(num_encoding_functions):
+    frequency_bands = None
+    if log_sampling:
+        frequency_bands = 2. ** torch.linspace(
+            0., num_encoding_functions - 1, num_encoding_functions,
+            dtype=tensor.dtype, device=tensor.device,
+        )
+    else:
+        frequency_bands = torch.linspace(
+            2. ** 0., 2. ** (num_encoding_functions - 1), num_encoding_functions,
+            dtype=tensor.dtype, device=tensor.device
+        )
+
+    for freq in frequency_bands:
         for func in [torch.sin, torch.cos]:
-            encoding.append(func(2.0 ** i * tensor))
+            encoding.append(func(tensor * freq))
+
     return torch.cat(encoding, dim=-1)
+
+
+def get_embedding_function(
+    num_encoding_functions=6, include_input=True, log_sampling=True
+):
+    r"""Returns a lambda function that internally calls positional_encoding.
+    """
+    return lambda x: positional_encoding(
+        x, num_encoding_functions, include_input, log_sampling
+    )
 
 
 def ndc_rays(H, W, focal, near, rays_o, rays_d):

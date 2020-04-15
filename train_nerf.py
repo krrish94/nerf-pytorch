@@ -12,7 +12,7 @@ from tqdm import tqdm, trange
 
 from nerf import (CfgNode, get_ray_bundle, img2mse, load_blender_data,
                   load_llff_data, meshgrid_xy, models, mse2psnr,
-                  positional_encoding, run_one_iter_of_nerf)
+                  get_embedding_function, run_one_iter_of_nerf)
 
 
 def main():
@@ -97,30 +97,17 @@ def main():
     else:
         device = "cpu"
 
-    # # Encoding function for position (xyz).
-    # encode_position_fn = lambda x: positional_encoding(
-    #     x, num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
-    #     include_input=cfg.models.coarse.include_input_xyz
-    # )
-    # # Encoding function for direction.
-    # encode_direction_fn = lambda x: positional_encoding(
-    #     x, num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
-    #     include_input=cfg.models.coarse.include_input_dir
-    # )
+    encode_position_fn = get_embedding_function(
+        num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
+        include_input=cfg.models.coarse.include_input_xyz,
+        log_sampling=cfg.models.coarse.log_sampling_xyz,
+    )
 
-    def encode_position_fn(x):
-        return positional_encoding(
-            x,
-            num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
-            include_input=cfg.models.coarse.include_input_xyz,
-        )
-
-    def encode_direction_fn(x):
-        return positional_encoding(
-            x,
-            num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
-            include_input=cfg.models.coarse.include_input_dir,
-        )
+    encode_direction_fn = get_embedding_function(
+        num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
+        include_input=cfg.models.coarse.include_input_dir,
+        log_sampling=cfg.models.coarse.log_sampling_dir,
+    )
 
     # Initialize a coarse-resolution model.
     model_coarse = getattr(models, cfg.models.coarse.type)(

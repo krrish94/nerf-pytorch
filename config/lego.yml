@@ -1,7 +1,7 @@
 # Parameters to setup experiment.
 experiment:
   # Unique experiment identifier
-  id: lego-lowres
+  id: lego-lowres3
   # Experiment logs will be stored at "logdir"/"id"
   logdir: logs
   # Seed for random number generators (for repeatability).
@@ -44,19 +44,22 @@ models:
     # Name of the torch.nn.Module class that implements the model.
     type: FlexibleNeRFModel
     # Number of layers in the model.
-    num_layers: 4
+    num_layers: 8
     # Number of hidden units in each layer of the MLP (multi-layer
     # perceptron).
-    hidden_size: 64
+    hidden_size: 128
     # Add a skip connection once in a while. Note: This parameter
     # won't take affect unless num_layers > skip_connect_every.
     skip_connect_every: 3
     # Whether to include the position (xyz) itself in its positional
     # encoding.
     include_input_xyz: True
+    # Whether or not to perform log sampling in the positional encoding
+    # of the coordinates.
+    log_sampling_xyz: True
     # Number of encoding functions to use in the positional encoding
     # of the coordinates.
-    num_encoding_fn_xyz: 6
+    num_encoding_fn_xyz: 10
     # Additionally use viewing directions as input.
     use_viewdirs: True
     # Whether to include the direction itself in its positional encoding.
@@ -64,12 +67,15 @@ models:
     # Number of encoding functions to use in the positional encoding
     # of the direction.
     num_encoding_fn_dir: 4
+    # Whether or not to perform log sampling in the positional encoding
+    # of the direction.
+    log_sampling_dir: True
   # Fine model.
   fine:
     # Name of the torch.nn.Module class that implements the model.
     type: FlexibleNeRFModel
     # Number of layers in the model.
-    num_layers: 4
+    num_layers: 8
     # Number of hidden units in each layer of the MLP (multi-layer
     # perceptron).
     hidden_size: 128
@@ -78,10 +84,13 @@ models:
     skip_connect_every: 3
     # Number of encoding functions to use in the positional encoding
     # of the coordinates.
-    num_encoding_fn_xyz: 6
+    num_encoding_fn_xyz: 10
     # Whether to include the position (xyz) itself in its positional
     # encoding.
     include_input_xyz: True
+    # Whether or not to perform log sampling in the positional encoding
+    # of the coordinates.
+    log_sampling_xyz: True
     # Additionally use viewing directions as input.
     use_viewdirs: True
     # Whether to include the direction itself in its positional encoding.
@@ -89,6 +98,9 @@ models:
     # Number of encoding functions to use in the positional encoding of
     # the direction.
     num_encoding_fn_dir: 4
+    # Whether or not to perform log sampling in the positional encoding
+    # of the direction.
+    log_sampling_dir: True
 
 # Optimizer params.
 optimizer:
