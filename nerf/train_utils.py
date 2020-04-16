@@ -25,10 +25,6 @@ def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn):
     return radiance_field
 
 
-def identity_encoding(x):
-    return x
-
-
 def predict_and_render_radiance(
     ray_batch,
     model_coarse,
@@ -39,11 +35,6 @@ def predict_and_render_radiance(
     encode_direction_fn=None,
 ):
     # TESTED
-    if encode_position_fn is None:
-        encode_position_fn = identity_encoding
-    if encode_direction_fn is None:
-        encode_direction_fn = identity_encoding
-
     num_rays = ray_batch.shape[0]
     ro, rd = ray_batch[..., :3], ray_batch[..., 3:6]
     bounds = ray_batch[..., 6:8].view((-1, 1, 2))
@@ -98,7 +89,6 @@ def predict_and_render_radiance(
         white_background=getattr(options.nerf, mode).white_background,
     )
 
-    # TODO: Implement importance sampling, and finer network.
     rgb_fine, disp_fine, acc_fine = None, None, None
     if getattr(options.nerf, mode).num_fine > 0:
         # rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
@@ -150,13 +140,6 @@ def run_one_iter_of_nerf(
     encode_position_fn=None,
     encode_direction_fn=None,
 ):
-    if encode_position_fn is None:
-        encode_position_fn = identity_encoding
-    if encode_direction_fn is None:
-        encode_direction_fn = identity_encoding
-
-    # ray_origins = batch_rays[0]
-    # ray_directions = batch_rays[1]
     viewdirs = None
     if options.nerf.use_viewdirs:
         # Provide ray directions as input
@@ -197,11 +180,20 @@ def run_one_iter_of_nerf(
         for batch in batches
     ]
     synthesized_images = list(zip(*pred))
-    synthesized_images = [torch.cat(image, dim=0) for image in synthesized_images]
+    synthesized_images = [torch.cat(image, dim=0) if image[0] is not None else (None) for image in synthesized_images]
     if mode == "validation":
         synthesized_images = [
-            image.view(shape)
+            image.view(shape) if image is not None else None
             for (image, shape) in zip(synthesized_images, restore_shapes)
         ]
-    # Returns rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine.
+    
+        # Returns rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine
+        # (assuming both the coarse and fine networks are used).
+        if model_fine:
+            return tuple(synthesized_images)
+        else:
+            # If the fine network is not used, rgb_fine, disp_fine, acc_fine are
+            # set to None.
+            return tuple(synthesized_images + [None, None, None])
+
     return tuple(synthesized_images)
