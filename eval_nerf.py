@@ -133,7 +133,7 @@ def main():
     times_per_image = []
     for i, pose in enumerate(tqdm(render_poses)):
         start = time.time()
-        rgb_coarse = None
+        rgb = None, None
         with torch.no_grad():
             ray_origins, ray_directions = get_ray_bundle(hwf[0], hwf[1], hwf[2], pose)
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
@@ -149,10 +149,11 @@ def main():
                 encode_position_fn=encode_position_fn,
                 encode_direction_fn=encode_direction_fn,
             )
+            rgb = rgb_fine if rgb_fine is not None else rgb_coarse
         times_per_image.append(time.time() - start)
         if configargs.savedir:
             savefile = os.path.join(configargs.savedir, f"{i:04d}.png")
-            imageio.imwrite(savefile, cast_to_image(rgb_coarse[..., :3]))
+            imageio.imwrite(savefile, cast_to_image(rgb[..., :3]))
         tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
 
 
