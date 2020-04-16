@@ -61,12 +61,22 @@ Optimizing a NeRF takes between a few hours and a day or two (depending on resol
 
 ## How to train your NeRF super-quickly!
 
-To train a "full" NeRF model (i.e., using 3D coordinates as well as ray directions, and the hierarchical sampling procedure), first setup dependencies. In a new `conda` or `virtualenv` environment, run
+To train a "full" NeRF model (i.e., using 3D coordinates as well as ray directions, and the hierarchical sampling procedure), first setup dependencies. 
+
+### Using pip
+In a new `conda` or `virtualenv` environment, run 
+using pip
 ```bash
 pip install -r requirements.txt
 ```
-
 **Importantly**, install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted) by following instructions from their `README`.
+
+### Alternatively, using conda
+```bash
+cd nerf-pytorch 
+conda env create
+conda activate nerf
+```
 
 Once everything is setup, to run experiments, first edit `config/lego.yml` to specify your own parameters.
 
