@@ -10,10 +10,10 @@ import yaml
 from tqdm import tqdm
 
 from nerf import (CfgNode, get_ray_bundle, load_blender_data, load_llff_data,
-                  models, positional_encoding, run_one_iter_of_nerf)
+                  models, get_embedding_function, run_one_iter_of_nerf)
 
 
-def cast_to_image(tensor):
+def cast_to_image(tensor, dataset_type):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
     tensor = tensor.permute(2, 0, 1)
     # Convert to PIL Image and then np.array (output shape: (H, W, 3))
@@ -68,24 +68,24 @@ def main():
         hwf = [int(H), int(W), focal]
         render_poses = torch.from_numpy(render_poses)
 
-    def encode_position_fn(x):
-        return positional_encoding(
-            x,
-            num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
-            include_input=cfg.models.coarse.include_input_xyz,
-        )
-
-    def encode_direction_fn(x):
-        return positional_encoding(
-            x,
-            num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
-            include_input=cfg.models.coarse.include_input_dir,
-        )
-
     # Device on which to run.
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda"
+
+    encode_position_fn = get_embedding_function(
+        num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
+        include_input=cfg.models.coarse.include_input_xyz,
+        log_sampling=cfg.models.coarse.log_sampling_xyz
+    )
+
+    encode_direction_fn = None
+    if cfg.models.coarse.use_viewdirs:
+        encode_direction_fn = get_embedding_function(
+            num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
+            include_input=cfg.models.coarse.include_input_dir,
+            log_sampling=cfg.models.coarse.log_sampling_dir,
+        )
 
     # Initialize a coarse resolution model.
     model_coarse = getattr(models, cfg.models.coarse.type)(
@@ -119,6 +119,12 @@ def main():
                 "The checkpoint has a fine-level model, but it could "
                 "not be loaded (possibly due to a mismatched config file."
             )
+    if "height" in checkpoint.keys():
+        hwf[0] = checkpoint["height"]
+    if "width" in checkpoint.keys():
+        hwf[1] = checkpoint["width"]
+    if "focal_length" in checkpoint.keys():
+        hwf[2] = checkpoint["focal_length"]
 
     model_coarse.eval()
     if model_fine:
@@ -135,6 +141,7 @@ def main():
         start = time.time()
         rgb = None, None
         with torch.no_grad():
+            pose = pose[:3, :4]
             ray_origins, ray_directions = get_ray_bundle(hwf[0], hwf[1], hwf[2], pose)
             rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
                 hwf[0],
@@ -153,7 +160,7 @@ def main():
         times_per_image.append(time.time() - start)
         if configargs.savedir:
             savefile = os.path.join(configargs.savedir, f"{i:04d}.png")
-            imageio.imwrite(savefile, cast_to_image(rgb[..., :3]))
+            imageio.imwrite(savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower()))
         tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
 
 
