@@ -31,13 +31,13 @@ The current implementation is **_blazing fast!_** (**~5-9x faster** than the [or
 
 ## Sample results from the repo
 
-<p align="center">
+<!--<p align="center"> 
     <img src="assets/lego-lowres.gif">
-</p>
+</p> -->
 
-:--------------------------------: | :-------------------------:
-![](assets/lego-lowres.gif)        | ![](assets/fern-lowres.gif)
-![](assets/hotdog-lowres.gif)      |
+
+![](assets/lego-lowres.gif)        ![](assets/fern-lowres.gif)
+![](assets/hotdog-lowres.gif)
 
 
 ## Tiny-NeRF on Google Colab
