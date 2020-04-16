@@ -22,7 +22,7 @@ A PyTorch re-implementation of [Neural Radiance Fields](http://tancik.com/nerf).
 
 ## Speed matters!
 
-The current implementation is **_blazing fast!_** (**~9x faster** than the [original release](https://github.com/bmild/nerf), **~4x faster** than this [concurrent pytorch implementation](https://github.com/yenchenlin/nerf-pytorch))
+The current implementation is **_blazing fast!_** (**~5-9x faster** than the [original release](https://github.com/bmild/nerf), **~2-4x faster** than this [concurrent pytorch implementation](https://github.com/yenchenlin/nerf-pytorch))
 
 > _What's the secret sauce behind this speedup?_
 
@@ -34,6 +34,10 @@ The current implementation is **_blazing fast!_** (**~9x faster** than the [orig
 <p align="center">
     <img src="assets/lego-lowres.gif">
 </p>
+
+:--------------------------------: | :-------------------------:
+![](assets/lego-lowres.gif)        | ![](assets/fern-lowres.gif)
+![](assets/hotdog-lowres.gif)      |
 
 
 ## Tiny-NeRF on Google Colab
@@ -54,7 +58,7 @@ Optimizing a NeRF takes between a few hours and a day or two (depending on resol
 
 To train a "full" NeRF model (i.e., using 3D coordinates as well as ray directions, and the hierarchical sampling procedure), first setup dependencies. In a new `conda` or `virtualenv` environment, run
 ```bash
-pip install requirements.txt
+pip install -r requirements.txt
 ```
 
 **Importantly**, install [torchsearchsorted](https://github.com/aliutkus/torchsearchsorted) by following instructions from their `README`.
@@ -88,11 +92,11 @@ This samples `8192` rays per image from the `lego` dataset. Each image is `800 x
 A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can be accessed [here](https://colab.research.google.com/drive/1L6QExI2lw5xhJ-MLlIwpbgf7rxW7fcz3).
 
 
-## Render fun videos
+## Render fun videos (from a pretrained model)
 
 Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that. For the `lego-lowres` example, this would be
 ```bash
-python eval_nerf.py --config logs/lego-lowres/config.yml --checkpoint logs/lego-lowres/checkpoint200000.ckpt --savedir cache/rendered/lego-lowres
+python eval_nerf.py --config pretrained/lego-lowres/config.yml --checkpoint pretrained/lego-lowres/checkpoint199999.ckpt --savedir cache/rendered/lego-lowres
 ```
 
 You can create a `gif` out of the saved images, for instance, by using [Imagemagick](https://imagemagick.org/).
@@ -117,7 +121,16 @@ The code is thoroughly tested (to the best of my abilities) to match the origina
 
 The organization of code **WILL** change around a lot, because I'm actively experimenting with this.
 
-**Pretrained models**: I am running a few large-scale experiments, and I hope to release models sometime in the next few days.
+**Pretrained models**: Pretrained models for the following scenes are available in the `pretrained` directory (all of them are currently lowres). I will continue adding models herein.
+```
+# Synthetic (Blender) scenes
+hotdog
+lego
+ship
+
+# Real (LLFF) scenes
+fern
+```
 
 
 ## Contributing / Issues?
