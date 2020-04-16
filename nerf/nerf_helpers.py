@@ -144,7 +144,11 @@ def positional_encoding(
         for func in [torch.sin, torch.cos]:
             encoding.append(func(tensor * freq))
 
-    return torch.cat(encoding, dim=-1)
+    # Special case, for no positional encoding
+    if len(encoding) == 1:
+        return encoding[0]
+    else:
+        return torch.cat(encoding, dim=-1)
 
 
 def get_embedding_function(

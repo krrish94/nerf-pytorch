@@ -1,0 +1,156 @@
+# Parameters to setup experiment.
+experiment:
+  # Unique experiment identifier
+  id: fern
+  # Experiment logs will be stored at "logdir"/"id"
+  logdir: logs
+  # Seed for random number generators (for repeatability).
+  randomseed: 34  # 8239
+  # Number of training iterations.
+  train_iters: 250000
+  # Number of training iterations after which to validate.
+  validate_every: 50
+  # Number of training iterations after which to checkpoint.
+  save_every: 5000
+  # Number of training iterations after which to print progress.
+  print_every: 100
+
+# Dataset parameters.
+dataset:
+  # Type of the dataset (Blender vs LLFF vs DeepVoxels vs something else)
+  type: llff
+  # Base directory of dataset.
+  basedir: cache/nerf_llff_data/fern
+  # Optionally, provide a path to the pre-cached dataset dir. This
+  # overrides the other dataset options.
+  # cachedir: cache/legocache200
+  # Do not use NDC (normalized device coordinates). Usually True for
+  # synthetic (Blender) datasets.
+  no_ndc: False
+  # Near clip plane (clip all depth values closer than this threshold).
+  near: 0
+  # Far clip plane (clip all depth values farther than this threshold).
+  far: 1
+  # Downsample factor (used to downsample input images)
+  downsample_factor: 8
+  # TODO: Add description
+  llffhold: 8
+
+# Model parameters.
+models:
+  # Coarse model.
+  coarse:
+    # Name of the torch.nn.Module class that implements the model.
+    type: FlexibleNeRFModel
+    # Number of layers in the model.
+    num_layers: 4
+    # Number of hidden units in each layer of the MLP (multi-layer
+    # perceptron).
+    hidden_size: 64
+    # Add a skip connection once in a while. Note: This parameter
+    # won't take affect unless num_layers > skip_connect_every.
+    skip_connect_every: 3
+    # Whether to include the position (xyz) itself in its positional
+    # encoding.
+    include_input_xyz: True
+    # Number of encoding functions to use in the positional encoding
+    # of the coordinates.
+    num_encoding_fn_xyz: 6
+    # Additionally use viewing directions as input.
+    use_viewdirs: True
+    # Whether to include the direction itself in its positional encoding.
+    include_input_dir: True
+    # Number of encoding functions to use in the positional encoding
+    # of the direction.
+    num_encoding_fn_dir: 4
+    log_sampling_xyz: True
+    log_sampling_dir: True
+  # Fine model.
+  fine:
+    # Name of the torch.nn.Module class that implements the model.
+    type: FlexibleNeRFModel
+    # Number of layers in the model.
+    num_layers: 4
+    # Number of hidden units in each layer of the MLP (multi-layer
+    # perceptron).
+    hidden_size: 64
+    # Add a skip connection once in a while. Note: This parameter
+    # won't take affect unless num_layers > skip_connect_every.
+    skip_connect_every: 3
+    # Number of encoding functions to use in the positional encoding
+    # of the coordinates.
+    num_encoding_fn_xyz: 6
+    # Whether to include the position (xyz) itself in its positional
+    # encoding.
+    include_input_xyz: True
+    # Additionally use viewing directions as input.
+    use_viewdirs: True
+    # Whether to include the direction itself in its positional encoding.
+    include_input_dir: True
+    # Number of encoding functions to use in the positional encoding of
+    # the direction.
+    num_encoding_fn_dir: 4
+    log_sampling_xyz: True
+    log_sampling_dir: True
+
+# Optimizer params.
+optimizer:
+  # Name of the torch.optim class used for optimization.
+  type: Adam
+  # Learning rate.
+  lr: 5.0E-3
+
+# Learning rate schedule.
+scheduler:
+  # Exponentially decay learning rate (in 1000 steps).
+  lr_decay: 250
+  # Rate at which to apply this decay.
+  lr_decay_factor: 0.1
+
+# NeRF parameters.
+nerf:
+  # Use viewing directions as input, in addition to the X, Y, Z coordinates.
+  use_viewdirs: True
+  # Encoding function for position (X, Y, Z).
+  encode_position_fn: positional_encoding
+  # Encoding function for ray direction (theta, phi).
+  encode_direction_fn: positional_encoding
+  # Training-specific parameters.
+  train:
+    # Number of random rays to retain from each image.
+    # These sampled rays are used for training, and the others are discarded.
+    num_random_rays: 4096  # 32 * 32 * 4
+    # Size of each chunk (rays are batched into "chunks" and passed through
+    # the network)
+    chunksize: 16384  # 1024 * 32
+    # Whether or not to perturb the sampled depth values.
+    perturb: True
+    # Number of depth samples per ray for the coarse network.
+    num_coarse: 64
+    # Number of depth samples per ray for the fine network.
+    num_fine: 128
+    # Whether to render models using a white background.
+    white_background: False
+    # Standard deviation of noise to be added to the radiance field when
+    # performing volume rendering.
+    radiance_field_noise_std: 1.
+    # Sample linearly in disparity space, as opposed to in depth space.
+    lindisp: False
+  # Validation-specific parameters.
+  validation:
+    # Number of random rays to retain from each image.
+    # These sampled rays are used for training, and the others are discarded.
+    chunksize: 16384  # 1024 * 32
+    # Whether or not to perturb the sampled depth values.
+    perturb: False
+    # Number of depth samples per ray for the coarse network.
+    num_coarse: 64
+    # Number of depth samples per ray for the fine network.
+    num_fine: 128
+    # Whether to render models using a white background.
+    white_background: False
+    # Standard deviation of noise to be added to the radiance field when
+    # performing volume rendering.
+    radiance_field_noise_std: 0.
+    # Sample linearly in disparity space, as opposed to in depth space.
+    lindisp: False

@@ -62,6 +62,8 @@ def main():
             H, W, focal = hwf
             H, W = int(H), int(W)
             hwf = [H, W, focal]
+            if cfg.nerf.train.white_background:
+                images = images[..., :3] * images[..., -1:] + (1. - images[..., -1:])
         elif cfg.dataset.type.lower() == "llff":
             images, poses, bds, render_poses, i_test = load_llff_data(
                 cfg.dataset.basedir, factor=cfg.dataset.downsample_factor
@@ -102,12 +104,14 @@ def main():
         include_input=cfg.models.coarse.include_input_xyz,
         log_sampling=cfg.models.coarse.log_sampling_xyz,
     )
-
-    encode_direction_fn = get_embedding_function(
-        num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
-        include_input=cfg.models.coarse.include_input_dir,
-        log_sampling=cfg.models.coarse.log_sampling_dir,
-    )
+    
+    encode_direction_fn = None
+    if cfg.models.coarse.use_viewdirs:
+        encode_direction_fn = get_embedding_function(
+            num_encoding_functions=cfg.models.coarse.num_encoding_fn_dir,
+            include_input=cfg.models.coarse.include_input_dir,
+            log_sampling=cfg.models.coarse.log_sampling_dir,
+        )
 
     # Initialize a coarse-resolution model.
     model_coarse = getattr(models, cfg.models.coarse.type)(
