@@ -1,0 +1,68 @@
+dataset:
+  basedir: cache/nerf_llff_data/fern
+  downsample_factor: 8
+  far: 1
+  llffhold: 8
+  near: 0
+  no_ndc: false
+  type: llff
+experiment:
+  id: fern
+  logdir: logs
+  print_every: 100
+  randomseed: 34
+  save_every: 5000
+  train_iters: 250000
+  validate_every: 5000
+models:
+  coarse:
+    hidden_size: 64
+    include_input_dir: true
+    include_input_xyz: true
+    log_sampling_dir: true
+    log_sampling_xyz: true
+    num_encoding_fn_dir: 4
+    num_encoding_fn_xyz: 6
+    num_layers: 4
+    skip_connect_every: 3
+    type: FlexibleNeRFModel
+    use_viewdirs: true
+  fine:
+    hidden_size: 64
+    include_input_dir: true
+    include_input_xyz: true
+    log_sampling_dir: true
+    log_sampling_xyz: true
+    num_encoding_fn_dir: 4
+    num_encoding_fn_xyz: 6
+    num_layers: 4
+    skip_connect_every: 3
+    type: FlexibleNeRFModel
+    use_viewdirs: true
+nerf:
+  encode_direction_fn: positional_encoding
+  encode_position_fn: positional_encoding
+  train:
+    chunksize: 16384
+    lindisp: false
+    num_coarse: 64
+    num_fine: 64
+    num_random_rays: 1024
+    perturb: true
+    radiance_field_noise_std: 1.0
+    white_background: false
+  use_viewdirs: true
+  validation:
+    chunksize: 16384
+    lindisp: false
+    num_coarse: 64
+    num_fine: 64
+    perturb: false
+    radiance_field_noise_std: 0.0
+    white_background: false
+optimizer:
+  lr: 0.005
+  type: Adam
+scheduler:
+  lr_decay: 250
+  lr_decay_factor: 0.1
