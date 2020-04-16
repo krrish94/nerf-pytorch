@@ -31,17 +31,18 @@ The current implementation is **_blazing fast!_** (**~5-9x faster** than the [or
 
 ## Sample results from the repo
 
-<!--<p align="center"> 
-    <img src="assets/lego-lowres.gif">
-</p> -->
 
 #### On synthetic data
 
-![](assets/lego-lowres.gif) ![](assets/hotdog-lowres.gif)
+<p align="center"> 
+    <img src="assets/lego-lowres.gif"> <img src="assets/hotdog-lowres.gif">
+</p>
 
 ### On real data
 
-![](assets/fern-lowres.gif)
+<p align="center"> 
+    <img src="assets/fern-lowres.gif">
+</p>
 
 
 ## Tiny-NeRF on Google Colab
