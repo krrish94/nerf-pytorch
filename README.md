@@ -34,13 +34,7 @@ The current implementation is **_blazing fast!_** (**~5-9x faster** than the [or
 
 #### On synthetic data
 
-<p align="center"> 
-    <img src="assets/lego-lowres.gif">
-</p>
-
-<p align="center">
-    <img src="assets/hotdog-lowres.gif">
-</p>
+![](assets/lego-lowres.gif) ![](assets/hotdog-lowres.gif)
 
 ### On real data
 
