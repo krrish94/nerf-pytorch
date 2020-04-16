@@ -25,7 +25,15 @@ A PyTorch re-implementation of [Neural Radiance Fields](http://tancik.com/nerf).
 The current implementation is **_blazing fast!_** (**~9x faster** than the [original release](https://github.com/bmild/nerf), **~4x faster** than this [concurrent pytorch implementation](https://github.com/yenchenlin/nerf-pytorch))
 
 > _What's the secret sauce behind this speedup?_
+
 > Multiple aspects. Besides obvious enhancements such as data caching, effective memory management, etc. I drilled down through the entire NeRF codebase, and reduced data transfer b/w CPU and GPU, vectorized code where possible, and used efficient variants of pytorch ops (wrote some where unavailable). But for these changes, everything else is a faithful reproduction of the NeRF technique we all admire :)
+
+
+## Sample results from the repo
+
+<p align="center">
+    <img src="assets/lego-lowres.gif">
+</p>
 
 
 ## Tiny-NeRF on Google Colab
@@ -67,7 +75,7 @@ python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoi
 
 An optional, yet simple preprocessing step of caching rays from the dataset results in substantial compute time savings (reduced carbon footprint, yay!), especially when running multiple experiments. It's super-simple: run
 ```bash
-python cache_dataset.py --datapath cache/nerf_synthetic/lego/ --halfres False --savedir cache/legocache/legofull --num-random-rays 8192 --num-variations 500
+python cache_dataset.py --datapath cache/nerf_synthetic/lego/ --halfres False --savedir cache/legocache/legofull --num-random-rays 8192 --num-variations 50
 ```
 
 This samples `8192` rays per image from the `lego` dataset. Each image is `800 x 800` (since `halfres` is set to `False`), and `500` such random samples (`8192` rays each) are drawn per image. The script takes about 10 minutes to run, but the good thing is, this needs to be run only once per dataset.
@@ -82,15 +90,21 @@ A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can b
 
 ## Render fun videos
 
-Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that.
+Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that. For the `lego-lowres` example, this would be
 ```bash
-python eval_nerf.py --config logs/experiment_id/config.yml --checkpoint logs/experiment_id/checkpoint100000.ckpt --savedir cache/rendered/experiment_id
+python eval_nerf.py --config logs/lego-lowres/config.yml --checkpoint logs/lego-lowres/checkpoint200000.ckpt --savedir cache/rendered/lego-lowres
 ```
 
 You can create a `gif` out of the saved images, for instance, by using [Imagemagick](https://imagemagick.org/).
 ```bash
-convert cache/rendered/experiment_id/*.png cache/rendered/experiment_id.gif
+convert cache/rendered/lego-lowres/*.png cache/rendered/lego-lowres.gif
 ```
+
+This should give you a gif like this.
+
+<p align="center">
+    <img src="assets/lego-lowres.gif">
+</p>
 
 
 ## A note on reproducibility
