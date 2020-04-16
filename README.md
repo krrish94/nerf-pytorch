@@ -36,8 +36,8 @@ The current implementation is **_blazing fast!_** (**~5-9x faster** than the [or
 </p> -->
 
 
-![](assets/lego-lowres.gif)        ![](assets/fern-lowres.gif)
-![](assets/hotdog-lowres.gif)
+![](assets/lego-lowres.gif) ![](assets/hotdog-lowres.gif)
+![](assets/fern-lowres.gif)
 
 
 ## Tiny-NeRF on Google Colab
