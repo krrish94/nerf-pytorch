@@ -9,8 +9,15 @@ import torchvision
 import yaml
 from tqdm import tqdm
 
-from nerf import (CfgNode, get_ray_bundle, load_blender_data, load_llff_data,
-                  models, get_embedding_function, run_one_iter_of_nerf)
+from nerf import (
+    CfgNode,
+    get_ray_bundle,
+    load_blender_data,
+    load_llff_data,
+    models,
+    get_embedding_function,
+    run_one_iter_of_nerf,
+)
 
 
 def cast_to_image(tensor, dataset_type):
@@ -85,7 +92,7 @@ def main():
     encode_position_fn = get_embedding_function(
         num_encoding_functions=cfg.models.coarse.num_encoding_fn_xyz,
         include_input=cfg.models.coarse.include_input_xyz,
-        log_sampling=cfg.models.coarse.log_sampling_xyz
+        log_sampling=cfg.models.coarse.log_sampling_xyz,
     )
 
     encode_direction_fn = None
@@ -174,7 +181,9 @@ def main():
         times_per_image.append(time.time() - start)
         if configargs.savedir:
             savefile = os.path.join(configargs.savedir, f"{i:04d}.png")
-            imageio.imwrite(savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower()))
+            imageio.imwrite(
+                savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower())
+            )
             if configargs.save_disparity_image:
                 savefile = os.path.join(configargs.savedir, "disparity", f"{i:04d}.png")
                 imageio.imwrite(savefile, cast_to_disparity_image(disp))

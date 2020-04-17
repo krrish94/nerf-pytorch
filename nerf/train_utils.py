@@ -180,13 +180,16 @@ def run_one_iter_of_nerf(
         for batch in batches
     ]
     synthesized_images = list(zip(*pred))
-    synthesized_images = [torch.cat(image, dim=0) if image[0] is not None else (None) for image in synthesized_images]
+    synthesized_images = [
+        torch.cat(image, dim=0) if image[0] is not None else (None)
+        for image in synthesized_images
+    ]
     if mode == "validation":
         synthesized_images = [
             image.view(shape) if image is not None else None
             for (image, shape) in zip(synthesized_images, restore_shapes)
         ]
-    
+
         # Returns rgb_coarse, disp_coarse, acc_coarse, rgb_fine, disp_fine, acc_fine
         # (assuming both the coarse and fine networks are used).
         if model_fine:

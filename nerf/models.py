@@ -136,7 +136,7 @@ class PaperNeRFModel(torch.nn.Module):
         use_viewdirs=True,
     ):
         super(PaperNeRFModel, self).__init__()
-        
+
         include_input_xyz = 3 if include_input_xyz else 0
         include_input_dir = 3 if include_input_dir else 0
         self.dim_xyz = include_input_xyz + 2 * 3 * num_encoding_fn_xyz
@@ -161,7 +161,7 @@ class PaperNeRFModel(torch.nn.Module):
         self.relu = torch.nn.functional.relu
 
     def forward(self, x):
-        xyz, dirs = x[..., :self.dim_xyz], x[..., self.dim_xyz:]
+        xyz, dirs = x[..., : self.dim_xyz], x[..., self.dim_xyz :]
         for i in range(8):
             if i == 4:
                 x = self.layers_xyz[i](torch.cat((xyz, x), -1))

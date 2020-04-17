@@ -130,14 +130,20 @@ def positional_encoding(
     encoding = [tensor] if include_input else []
     frequency_bands = None
     if log_sampling:
-        frequency_bands = 2. ** torch.linspace(
-            0., num_encoding_functions - 1, num_encoding_functions,
-            dtype=tensor.dtype, device=tensor.device,
+        frequency_bands = 2.0 ** torch.linspace(
+            0.0,
+            num_encoding_functions - 1,
+            num_encoding_functions,
+            dtype=tensor.dtype,
+            device=tensor.device,
         )
     else:
         frequency_bands = torch.linspace(
-            2. ** 0., 2. ** (num_encoding_functions - 1), num_encoding_functions,
-            dtype=tensor.dtype, device=tensor.device
+            2.0 ** 0.0,
+            2.0 ** (num_encoding_functions - 1),
+            num_encoding_functions,
+            dtype=tensor.dtype,
+            device=tensor.device,
         )
 
     for freq in frequency_bands:

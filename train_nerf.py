@@ -10,9 +10,9 @@ import yaml
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
 
-from nerf import (CfgNode, get_ray_bundle, img2mse, load_blender_data,
-                  load_llff_data, meshgrid_xy, models, mse2psnr,
-                  get_embedding_function, run_one_iter_of_nerf)
+from nerf import (CfgNode, get_embedding_function, get_ray_bundle, img2mse,
+                  load_blender_data, load_llff_data, meshgrid_xy, models,
+                  mse2psnr, run_one_iter_of_nerf)
 
 
 def main():
@@ -63,7 +63,7 @@ def main():
             H, W = int(H), int(W)
             hwf = [H, W, focal]
             if cfg.nerf.train.white_background:
-                images = images[..., :3] * images[..., -1:] + (1. - images[..., -1:])
+                images = images[..., :3] * images[..., -1:] + (1.0 - images[..., -1:])
         elif cfg.dataset.type.lower() == "llff":
             images, poses, bds, render_poses, i_test = load_llff_data(
                 cfg.dataset.basedir, factor=cfg.dataset.downsample_factor
@@ -104,7 +104,7 @@ def main():
         include_input=cfg.models.coarse.include_input_xyz,
         log_sampling=cfg.models.coarse.log_sampling_xyz,
     )
-    
+
     encode_direction_fn = None
     if cfg.models.coarse.use_viewdirs:
         encode_direction_fn = get_embedding_function(
@@ -250,7 +250,7 @@ def main():
                 rgb_fine[..., :3], target_ray_values[..., :3]
             )
         # loss = torch.nn.functional.mse_loss(rgb_pred[..., :3], target_s[..., :3])
-        loss = 0.
+        loss = 0.0
         # if fine_loss is not None:
         #     loss = fine_loss
         # else:
@@ -337,7 +337,7 @@ def main():
                     )
                     target_ray_values = img_target
                 coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
-                loss, fine_loss = 0., 0.
+                loss, fine_loss = 0.0, 0.0
                 if rgb_fine is not None:
                     fine_loss = img2mse(rgb_fine[..., :3], target_ray_values[..., :3])
                     loss = fine_loss
