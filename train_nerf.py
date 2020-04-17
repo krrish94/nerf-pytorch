@@ -250,6 +250,11 @@ def main():
                 rgb_fine[..., :3], target_ray_values[..., :3]
             )
         # loss = torch.nn.functional.mse_loss(rgb_pred[..., :3], target_s[..., :3])
+        loss = 0.
+        # if fine_loss is not None:
+        #     loss = fine_loss
+        # else:
+        #     loss = coarse_loss
         loss = coarse_loss + (fine_loss if fine_loss is not None else 0.0)
         loss.backward()
         psnr = mse2psnr(loss.item())
@@ -332,9 +337,12 @@ def main():
                     )
                     target_ray_values = img_target
                 coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
-                fine_loss = 0.0
+                loss, fine_loss = 0., 0.
                 if rgb_fine is not None:
                     fine_loss = img2mse(rgb_fine[..., :3], target_ray_values[..., :3])
+                    loss = fine_loss
+                else:
+                    loss = coarse_loss
                 loss = coarse_loss + fine_loss
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)

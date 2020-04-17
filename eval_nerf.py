@@ -23,6 +23,12 @@ def cast_to_image(tensor, dataset_type):
     # return np.moveaxis(img, [-1], [0])
 
 
+def cast_to_disparity_image(tensor):
+    img = (tensor - tensor.min()) / (tensor.max() - tensor.min())
+    img = img.clamp(0, 1) * 255
+    return img.detach().cpu().numpy().astype(np.uint8)
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -37,6 +43,9 @@ def main():
     )
     parser.add_argument(
         "--savedir", type=str, help="Save images to this directory, if specified."
+    )
+    parser.add_argument(
+        "--save-disparity-image", action="store_true", help="Save disparity images too."
     )
     configargs = parser.parse_args()
 
@@ -134,16 +143,19 @@ def main():
 
     # Create directory to save images to.
     os.makedirs(configargs.savedir, exist_ok=True)
+    if configargs.save_disparity_image:
+        os.makedirs(os.path.join(configargs.savedir, "disparity"), exist_ok=True)
 
     # Evaluation loop
     times_per_image = []
     for i, pose in enumerate(tqdm(render_poses)):
         start = time.time()
         rgb = None, None
+        disp = None, None
         with torch.no_grad():
             pose = pose[:3, :4]
             ray_origins, ray_directions = get_ray_bundle(hwf[0], hwf[1], hwf[2], pose)
-            rgb_coarse, _, _, rgb_fine, _, _ = run_one_iter_of_nerf(
+            rgb_coarse, disp_coarse, _, rgb_fine, disp_fine, _ = run_one_iter_of_nerf(
                 hwf[0],
                 hwf[1],
                 hwf[2],
@@ -157,10 +169,15 @@ def main():
                 encode_direction_fn=encode_direction_fn,
             )
             rgb = rgb_fine if rgb_fine is not None else rgb_coarse
+            if configargs.save_disparity_image:
+                disp = disp_fine if disp_fine is not None else disp_coarse
         times_per_image.append(time.time() - start)
         if configargs.savedir:
             savefile = os.path.join(configargs.savedir, f"{i:04d}.png")
             imageio.imwrite(savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower()))
+            if configargs.save_disparity_image:
+                savefile = os.path.join(configargs.savedir, "disparity", f"{i:04d}.png")
+                imageio.imwrite(savefile, cast_to_disparity_image(disp))
         tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
 
 
