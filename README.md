@@ -32,7 +32,7 @@ The current implementation is **_blazing fast!_** (**~5-9x faster** than the [or
 ## Sample results from the repo
 
 
-#### On synthetic data
+### On synthetic data
 
 <p align="center"> 
     <img src="assets/blender-lowres.gif">
@@ -80,6 +80,8 @@ conda env create
 conda activate nerf
 ```
 
+### Run training!
+
 Once everything is setup, to run experiments, first edit `config/lego.yml` to specify your own parameters.
 
 The training script can be invoked by running
@@ -87,12 +89,14 @@ The training script can be invoked by running
 python train_nerf.py --config config/lego.yml
 ```
 
+### Optional: Resume training from a checkpoint
+
 Optionally, if resuming training from a previous checkpoint, run
 ```bash
 python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt
 ```
 
-### Cache rays from the dataset (Optional)
+### Optional: Cache rays from the dataset
 
 An optional, yet simple preprocessing step of caching rays from the dataset results in substantial compute time savings (reduced carbon footprint, yay!), especially when running multiple experiments. It's super-simple: run
 ```bash
