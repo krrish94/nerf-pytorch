@@ -141,8 +141,11 @@ The organization of code **WILL** change around a lot, because I'm actively expe
 **Pretrained models**: Pretrained models for the following scenes are available in the `pretrained` directory (all of them are currently lowres). I will continue adding models herein.
 ```
 # Synthetic (Blender) scenes
+chair
+drums
 hotdog
 lego
+materials
 ship
 
 # Real (LLFF) scenes
