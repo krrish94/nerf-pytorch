@@ -90,7 +90,7 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
         focal = focal / 32.0
         imgs = [
             torch.from_numpy(
-                cv2.resize(imgs[i], dsize=(25, 25), interpolation=cv2.INTER_AREA)
+                cv2.resize(imgs[i], dsize=(H, W), interpolation=cv2.INTER_AREA)
             )
             for i in range(imgs.shape[0])
         ]
@@ -99,13 +99,12 @@ def load_blender_data(basedir, half_res=False, testskip=1, debug=False):
         return imgs, poses, render_poses, [H, W, focal], i_split
 
     if half_res:
-        # TODO: resize images using INTER_AREA (cv2)
         H = H // 2
         W = W // 2
         focal = focal / 2.0
         imgs = [
             torch.from_numpy(
-                cv2.resize(imgs[i], dsize=(400, 400), interpolation=cv2.INTER_AREA)
+                cv2.resize(imgs[i], dsize=(H, W), interpolation=cv2.INTER_AREA)
             )
             for i in range(imgs.shape[0])
         ]
