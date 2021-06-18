@@ -7,22 +7,27 @@ from .volume_rendering_utils import volume_render_radiance_field
 
 def run_network(network_fn, pts, ray_batch, chunksize, embed_fn, embeddirs_fn):
 
-    pts_flat = pts.reshape((-1, pts.shape[-1]))
-    embedded = embed_fn(pts_flat)
-    if embeddirs_fn is not None:
-        viewdirs = ray_batch[..., None, -3:]
-        input_dirs = viewdirs.expand(pts.shape)
-        input_dirs_flat = input_dirs.reshape((-1, input_dirs.shape[-1]))
-        embedded_dirs = embeddirs_fn(input_dirs_flat)
-        embedded = torch.cat((embedded, embedded_dirs), dim=-1)
+    radiance_fields = []
+    pts_batch = get_minibatches(pts, chunksize=pts.shape[0] // 4)
+    ray_batch = get_minibatches(ray_batch, chunksize=ray_batch.shape[0] // 4)
 
-    batches = get_minibatches(embedded, chunksize=chunksize)
-    preds = [network_fn(batch) for batch in batches]
-    radiance_field = torch.cat(preds, dim=0)
-    radiance_field = radiance_field.reshape(
-        list(pts.shape[:-1]) + [radiance_field.shape[-1]]
+    for pts_minibatch, ray_minibatch in zip(pts_batch, ray_batch):
+        pts_flat = pts_minibatch.reshape((-1, pts_minibatch.shape[-1]))
+        embedded = embed_fn(pts_flat)
+        if embeddirs_fn is not None:
+            viewdirs = ray_minibatch[..., None, -3:]
+            input_dirs = viewdirs.expand(pts_minibatch.shape)
+            input_dirs_flat = input_dirs.reshape((-1, input_dirs.shape[-1]))
+            embedded_dirs = embeddirs_fn(input_dirs_flat)
+            embedded = torch.cat((embedded, embedded_dirs), dim=-1)
+        radiance_fields.append(network_fn(embedded))
+        
+    radiance_fields = torch.cat(radiance_fields, dim=0)
+    radiance_fields = radiance_fields.reshape(
+        list(pts.shape[:-1]) + [radiance_fields.shape[-1]]
     )
-    return radiance_field
+    
+    return radiance_fields
 
 
 def predict_and_render_radiance(
